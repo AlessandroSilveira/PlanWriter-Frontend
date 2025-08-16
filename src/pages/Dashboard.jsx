@@ -3,16 +3,23 @@ import { Link } from 'react-router-dom'
 import { getProjects } from '../api/projects.js'
 
 export default function Dashboard() {
-  const [projects, setProjects] = useState([])
+ const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getProjects()
-      .then(data => setProjects(data || []))
-      .catch(() => setError('Erro ao carregar projetos'))
-      .finally(() => setLoading(false))
-  }, [])
+  getProjects()
+    .then(data => {
+      if (Array.isArray(data)) {
+        setProjects(data)
+      } else {
+        console.error("Resposta inesperada da API:", data)
+        setProjects([]) // garante que não quebre
+      }
+    })
+    .catch(() => setError('Erro ao carregar projetos'))
+    .finally(() => setLoading(false))
+}, [])
 
   if (loading) return <p>Carregando...</p>
 
@@ -22,6 +29,7 @@ export default function Dashboard() {
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <div className="grid md:grid-cols-2 gap-3">
         {projects.map(p => (
+          
           <Link key={p.id} to={`/projects/${p.id}`} className="card block">
             <h2 className="font-semibold">{p.title}</h2>
             <p className="text-sm text-gray-600">{p.description}</p>

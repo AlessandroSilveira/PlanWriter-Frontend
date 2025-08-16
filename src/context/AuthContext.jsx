@@ -1,38 +1,43 @@
-import { createContext, useState, useEffect } from 'react'
-import axios from 'axios'
+// src/context/AuthContext.jsx
+import { createContext, useState, useEffect } from "react";
+import api from "../api/http"; // opcional, mas útil se quiser interceptors globais também
 
-export const AuthContext = createContext()
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem('token'))
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token") || null);
 
   useEffect(() => {
-    axios.defaults.baseURL = API_URL
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    } else {
-      delete axios.defaults.headers.common['Authorization']
-    }
-  }, [token])
+    // nada aqui: quem injeta o token é o interceptor do http.js via localStorage
+  }, [token]);
 
-  const login = ({ accessToken, user }) => {
-    localStorage.setItem('token', accessToken)
-    setToken(accessToken)
-    setUser(user || null)
-  }
+  // 🔧 aceita vários nomes comuns para o token
+  const login = (payload) => {
+    const t =
+      payload?.accessToken ||
+      payload?.token ||
+      payload?.jwt ||
+      payload?.id_token ||
+      null;
+
+    if (!t) {
+      throw new Error("Token não encontrado na resposta de login.");
+    }
+    localStorage.setItem("token", t);
+    setToken(t);
+    setUser(payload?.user ?? null);
+  };
 
   const logout = () => {
-    localStorage.removeItem('token')
-    setToken(null)
-    setUser(null)
-  }
+    localStorage.removeItem("token");
+    setToken(null);
+    setUser(null);
+  };
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout }}>
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};

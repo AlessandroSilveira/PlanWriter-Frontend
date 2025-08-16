@@ -10,17 +10,29 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    try {
-      const data = await loginApi(email, password)
-      login({ accessToken: data.accessToken, user: data.user })
-      navigate('/')
-    } catch (err) {
-      setError('Falha no login. Verifique suas credenciais.')
-    }
+// src/pages/Login.jsx (trecho)
+// src/pages/Login.jsx (trecho principal)
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  try {
+    const data = await loginApi(email, password);
+    // passa a resposta inteira; o AuthContext extrai o token certo
+    login(data);
+    navigate("/");
+  } catch (err) {
+    console.error("LOGIN ERROR:", err?.response?.status, err?.response?.data, err?.message);
+    const apiMsg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      (typeof err?.response?.data === "string" ? err.response.data : null);
+
+    setError(apiMsg || "Falha no login. Verifique suas credenciais.");
   }
+};
+
+
+
 
   return (
     <div className="max-w-md mx-auto mt-10 card">
