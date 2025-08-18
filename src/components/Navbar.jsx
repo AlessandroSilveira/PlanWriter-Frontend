@@ -1,31 +1,28 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useContext } from 'react'
-import { AuthContext } from '../context/AuthContext.jsx'
+import { Link, useNavigate } from "react-router-dom";
+import useTheme from "../hooks/useTheme";
 
 export default function Navbar() {
-  const { token, logout } = useContext(AuthContext)
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
 
-  const onLogout = () => {
-    logout()
-    navigate('/login')
-  }
+  const logout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   return (
-    <nav className="w-full border-b bg-white">
-      <div className="max-w-5xl mx-auto p-3 flex items-center justify-between">
-        <Link to="/" className="font-semibold">PlanWriter</Link>
-        <div className="space-x-3">
-          {!token ? (
-            <>
-              <Link to="/login">Entrar</Link>
-              <Link to="/register">Registrar</Link>
-            </>
-          ) : (
-            <button onClick={onLogout}>Sair</button>
-          )}
-        </div>
+    <header className="flex items-center justify-between px-6 py-3 border-b shadow-sm">
+      <Link to="/" className="font-bold text-xl text-accent">
+        PlanWriter
+      </Link>
+      <div className="flex items-center gap-4">
+        <button onClick={toggle} className="text-sm border px-2 py-1 rounded">
+          {theme === "sepia" ? "🌙 Escuro" : "☀️ Claro"}
+        </button>
+        <button onClick={logout} className="text-sm border px-2 py-1 rounded">
+          Sair
+        </button>
       </div>
-    </nav>
-  )
+    </header>
+  );
 }

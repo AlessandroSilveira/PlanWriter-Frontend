@@ -1,49 +1,100 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getProjects } from '../api/projects.js'
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getProjects, getProjectStats } from '../api/projects.js';
+import ProgressStats from "../components/ProgressStats";
+import WeeklyProgressChart from "../components/WeeklyProgressChart";
+import WritingStats from "../components/WritingStats";
+import DailyProgressChart from "../components/DailyProgressChart";
 
 export default function Dashboard() {
- const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [projects, setProjects] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-  getProjects()
-    .then(data => {
-      if (Array.isArray(data)) {
-        setProjects(data)
-      } else {
-        console.error("Resposta inesperada da API:", data)
-        setProjects([]) // garante que não quebre
-      }
-    })
-    .catch(() => setError('Erro ao carregar projetos'))
-    .finally(() => setLoading(false))
-}, [])
+    getProjects()
+      .then(async data => {
+        if (Array.isArray(data)) {
+          setProjects(data);
+          if (data.length > 0) {
+            try {
+              const s = await getProjectStats(data[0].id);
+              setStats(s);
+            } catch (err) {
+              console.warn("Erro ao carregar estatísticas:", err);
+            }
+          }
+        } else {
+          setProjects([]);
+        }
+      })
+      .catch(() => setError('Erro ao carregar projetos'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  if (loading) return <p>Carregando...</p>
+  if (loading) return <p>Carregando...</p>;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Meus Projetos</h1>
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      <div className="grid md:grid-cols-2 gap-3">
-        {projects.map(p => (
-          
-          <Link key={p.id} to={`/projects/${p.id}`} className="card block">
-            <h2 className="font-semibold">{p.title}</h2>
-            <p className="text-sm text-gray-600">{p.description}</p>
-            <div className="mt-2 text-sm">
-              <p><b>{p.currentWordCount}</b> / {p.wordCountGoal ?? '—'} palavras</p>
-              {p.wordCountGoal ? (
-                <div className="w-full bg-gray-200 rounded h-2 mt-1">
-                  <div className="bg-gray-800 h-2 rounded" style={{ width: `${Math.min(100, Math.round(p.progressPercent ?? 0))}%` }} />
-                </div>
-              ) : null}
-            </div>
-          </Link>
-        ))}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Seus projetos</h1>
+        <Link to="/projects/new" className="button">+ Novo projeto</Link>
       </div>
+
+      {!projects?.length ? (
+        <div className="card text-center py-10">
+          <p className="text-gray-600 mb-4">Você ainda não tem projetos.</p>
+          <Link to="/projects/new" className="button">Criar primeiro projeto</Link>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projects.map((p) => {
+            const pid = p.id ?? p.projectId;
+            return (
+              <Link key={pid} to={`/projects/${pid}`} className="card block">
+                <h2 className="font-semibold">Projeto: {p.title ?? p.name}</h2>
+                {p.description && (
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    Descrição: {p.description}
+                  </p>
+                )}
+                {p.wordCountGoal ? (
+                  <div className="mt-2">
+                    <div className="w-full bg-gray-200 rounded h-2">
+                      <div className="bg-gray-800 h-2 rounded" style={{ width: `${Math.min(100, p.progressPercent ?? 0)}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {(p.currentWordCount ?? 0)} / {p.wordCountGoal} palavras
+                    </p>
+                  </div>
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-2">Resumo</h2>
+            <ProgressStats stats={stats} />
+          </div>
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-2">Progresso Diário</h2>
+            <WeeklyProgressChart history={stats.history} />
+          </div>
+          <div className="card lg:col-span-2">
+            <h2 className="text-lg font-semibold mb-2">Estatísticas</h2>
+            <WritingStats stats={stats} />
+          </div>
+          <div className="card lg:col-span-2">
+            <h2 className="text-lg font-semibold mb-2">Gráfico Diário</h2>
+            <DailyProgressChart daily={stats.daily} />
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }

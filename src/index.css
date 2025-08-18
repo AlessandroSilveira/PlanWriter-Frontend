@@ -1,17 +1,48 @@
+@import "./theme/writer.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Regras base de UI */
 :root {
   color-scheme: light;
 }
 
-button {
-  @apply px-3 py-2 rounded-md border bg-white hover:bg-gray-50;
+html.theme-sepia {
+  --bg: #f2eee6;
+  --bg-card: #f9f6ef;
+  --text: #1b1815;
+  --muted: #6e665d;
+  --line: #e3ded5;
+  --brand: #3d6d8e;
+  --accent: #b88b62;
 }
+
+html.theme-dark {
+  --bg: #141311;
+  --bg-card: #191815;
+  --text: #ece7de;
+  --muted: #b7b1a6;
+  --line: #2a2723;
+  --brand: #7fb4ff;
+  --accent: #c9a07b;
+}
+
+
+button {
+  @apply px-3 py-2 rounded-md border;
+}
+
 input, select, textarea {
   @apply border rounded-md px-3 py-2 w-full;
 }
+
 .card {
-  @apply bg-white rounded-xl border shadow-sm p-4;
+  @apply rounded-xl border shadow-sm p-4;
+}
+
+/* Força o fundo correto */
+html, body {
+  background-color: var(--bg) !important;
 }

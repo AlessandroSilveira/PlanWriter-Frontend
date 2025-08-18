@@ -1,6 +1,7 @@
 // src/pages/ProjectDetails.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import ProgressChart from "../components/ProgressChart.jsx";
 import {
   getProject,
   getProjectHistory,
@@ -21,7 +22,6 @@ export default function ProjectDetails() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
 
-  // carrega projeto e, se ok, depois o histórico (evita "corrida" e 2x chamadas)
   useEffect(() => {
     const abort = new AbortController();
 
@@ -67,18 +67,15 @@ export default function ProjectDetails() {
     }
 
     try {
-      // 1) Faz o POST. Se falhar aqui, mostramos erro e saímos
       await addProgress(id, {
         wordsWritten: n,
         date: new Date(date).toISOString(), // ISO
         note: note || undefined,
       });
 
-      // 2) Limpa o formulário
       setWordsWritten("");
       setNote("");
 
-      // 3) Recarrega (se alguma das leituras falhar, não derruba a UI)
       const [pRes, hRes] = await Promise.allSettled([
         getProject(id),
         getProjectHistory(id),
@@ -92,10 +89,8 @@ export default function ProjectDetails() {
           projectError: pRes.status === "rejected" ? pRes.reason : null,
           historyError: hRes.status === "rejected" ? hRes.reason : null,
         });
-        // não mostramos "Falha ao adicionar..." porque o POST foi OK
       }
     } catch (err) {
-      // Aqui só cai se o POST falhar
       console.error(
         "ADD PROGRESS ERROR:",
         err?.response?.status,
@@ -108,7 +103,8 @@ export default function ProjectDetails() {
         (typeof err?.response?.data === "string" ? err.response.data : null);
 
       setError(
-        apiMsg || "Falha ao adicionar progresso. Verifique autenticação e tente novamente."
+        apiMsg ||
+          "Falha ao adicionar progresso. Verifique autenticação e tente novamente."
       );
     }
   };
@@ -117,7 +113,6 @@ export default function ProjectDetails() {
     setError("");
     try {
       await deleteProgress(id, progressId);
-      // recarrega após excluir
       const [p, h] = await Promise.all([getProject(id), getProjectHistory(id)]);
       setProject(p);
       setHistory(h);
@@ -131,54 +126,77 @@ export default function ProjectDetails() {
 
   if (notFound)
     return (
-      <div className="card">
-        <button onClick={() => navigate(-1)} className="mb-3">
-          ← Voltar
-        </button>
-        <h1 className="text-xl font-semibold">Projeto não encontrado</h1>
-        <p className="text-sm text-gray-600">
-          Verifique se a URL está correta e se você está autenticado.
-        </p>
+      <div className="container">
+        <div className="card">
+          <button onClick={() => navigate(-1)} className="button secondary mb-3">
+            ← Voltar
+          </button>
+          <h1>Projeto não encontrado</h1>
+          <p className="text-gray-600">
+            Verifique se a URL está correta e se você está autenticado.
+          </p>
+        </div>
       </div>
     );
 
+  const pct = Math.min(
+    100,
+    Math.round(project?.progressPercent ?? 0)
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="container space-y-6">
       {/* Cabeçalho do projeto */}
       <div className="card">
-        <button onClick={() => navigate(-1)} className="mb-3">
+        <button onClick={() => navigate(-1)} className="button secondary mb-3">
           ← Voltar
         </button>
-        <h1 className="text-xl font-semibold">{project?.title}</h1>
+
+        <h1>Projeto: {project?.title}</h1>
         {project?.description && (
-          <p className="text-gray-600">{project.description}</p>
+          <p className="text-gray-600">Descrição: {project.description}</p>
         )}
-        <p className="mt-2">
-          <b>{project?.currentWordCount ?? 0}</b> /{" "}
-          {project?.wordCountGoal ?? "—"} palavras
-        </p>
+
+        <div className="mt-2">
+          <div className="badge" title="Progresso do projeto">Progresso: 
+            {(project?.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
+            {(project?.wordCountGoal ?? 0).toLocaleString("pt-BR") || "—"} palavras
+          </div>
+        </div>
+
         {project?.wordCountGoal ? (
-          <div className="w-full bg-gray-200 rounded h-2 mt-2">
+          <div className="progress mt-2" aria-label="Barra de progresso">
             <div
-              className="bg-gray-800 h-2 rounded"
-              style={{
-                width: `${Math.min(
-                  100,
-                  Math.round(project?.progressPercent ?? 0)
-                )}%`,
-              }}
+              className="fill"
+              style={{ width: `${pct}%` }}
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              role="progressbar"
             />
           </div>
         ) : null}
       </div>
 
+      {/* Evolução (gráfico) */}
+      <div className="card">
+        <h2 className="mb-2">Evolução</h2>
+        <ProgressChart
+          history={history}
+          currentWordCount={project?.currentWordCount ?? 0}
+          wordCountGoal={project?.wordCountGoal ?? null}
+        />
+        {project?.wordCountGoal ? (
+          <p className="text-gray-600" style={{ marginTop: 8 }}>
+            Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
+          </p>
+        ) : null}
+      </div>
+
       {/* Formulário para adicionar progresso */}
       <div className="card">
-        <h2 className="font-semibold mb-2">Adicionar progresso</h2>
-        <form
-          className="grid md:grid-cols-4 gap-3 items-end"
-          onSubmit={submitProgress}
-        >
+        <h2 className="mb-2">Adicionar progresso</h2>
+        <form className="grid md:grid-cols-4 gap-3 items-end" onSubmit={submitProgress}>
           <div className="md:col-span-2">
             <label className="block text-sm mb-1">Palavras escritas</label>
             <input
@@ -207,7 +225,7 @@ export default function ProjectDetails() {
             />
           </div>
           <div className="md:col-span-4">
-            <button type="submit">Adicionar</button>
+            <button type="submit" className="button">Adicionar</button>
           </div>
         </form>
         {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
@@ -215,27 +233,26 @@ export default function ProjectDetails() {
 
       {/* Histórico */}
       <div className="card">
-        <h2 className="font-semibold mb-3">Histórico</h2>
+        <h2 className="mb-3">Histórico</h2>
         {!history?.length ? (
-          <p className="text-sm text-gray-600">Sem entradas ainda.</p>
+          <p className="text-gray-600">Sem entradas ainda.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="history">
             {history.map((h, idx) => (
-              <li key={h.id ?? idx} className="flex items-center justify-between">
+              <li key={h.id ?? idx}>
                 <span>
-                  {new Date(h.date).toLocaleString()} —{" "}
-                  <b>{h.wordsWritten}</b> palavras
+                  {new Date(h.date).toLocaleString("pt-BR")} —{" "}
+                  <b>{(h.wordsWritten ?? 0).toLocaleString("pt-BR")}</b> palavras
                   {h.note || h.notes ? (
-                    <span className="text-gray-600 text-sm">
-                      {" "}
-                      — {h.note ?? h.notes}
-                    </span>
+                    <span className="text-gray-600"> — {h.note ?? h.notes}</span>
                   ) : null}
                 </span>
                 {h.id ? (
-                  <button onClick={() => removeProgress(h.id)}>Excluir</button>
+                  <button className="button secondary" onClick={() => removeProgress(h.id)}>
+                    Excluir
+                  </button>
                 ) : (
-                  <span className="text-xs text-gray-500">sem id</span>
+                  <span className="text-xs text-gray-500"></span>
                 )}
               </li>
             ))}

@@ -8,7 +8,7 @@ import Navbar from './components/Navbar.jsx'
 
 export default function App() {
   return (
-    <div>
+    <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] font-serif">
       <Navbar />
       <div className="max-w-5xl mx-auto p-4">
         <Routes>

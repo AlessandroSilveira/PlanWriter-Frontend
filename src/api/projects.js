@@ -1,4 +1,5 @@
 import api from "./http";
+import axios from 'axios';
 
 // use SEMPRE `api` (não axios)
 export const getProjects = async () => {
@@ -30,3 +31,22 @@ export const addProgress = async (projectId, { wordsWritten, date, note }) => {
 export const deleteProgress = async (projectId, progressId) => {
   await api.delete(`/projects/${projectId}/progress/${progressId}`);
 };
+
+// cria um projeto
+export const createProject = async ({ title, description, wordCountGoal, deadline }) => {
+  // ajuste os nomes para seu DTO do back:
+  const body = {
+    title: title,                      // ou "title" se o back usar esse nome
+    description: description || "",
+    wordCountGoal: wordCountGoal ? Number(wordCountGoal) : null, // ou "wordCountGoal"
+    deadline: deadline
+  };
+  const { data } = await api.post("/projects", body);
+  return data; // deve retornar o projeto criado (com id)
+};
+
+export const getProjectStats = async (projectId) => {
+  const { data } = await axios.get(`/projects/${projectId}/stats`);
+  return data;
+};
+
