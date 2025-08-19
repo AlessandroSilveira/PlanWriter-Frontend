@@ -1,30 +1,31 @@
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+export default function WritingStats({ stats }) {
+  if (!stats) return null;
 
-export default function WeeklyProgressChart({ history = [] }) {
-  if (!Array.isArray(history) || history.length === 0) {
-    return (
-      <div className="card p-4 text-center text-sm text-gray-600">
-        Nenhum dado de progresso disponível.
-      </div>
-    );
-  }
-
-  const data = history.map(item => ({
-    date: new Date(item.date).toLocaleDateString("pt-BR", { weekday: 'short', day: '2-digit', month: '2-digit' }),
-    words: item.words
-  }));
+  const items = [
+    { label: "Total de palavras", value: stats.totalWords?.toLocaleString("pt-BR") ?? "-" },
+    { label: "Média por dia", value: stats.averagePerDay?.toFixed(0) ?? "-" },
+    {
+      label: "Melhor dia",
+      value: stats.bestDay
+        ? `${stats.bestDay.date} (${stats.bestDay.words.toLocaleString("pt-BR")} palavras)`
+        : "-"
+    },
+    { label: "Dias com escrita", value: stats.activeDays ?? "-" },
+    { label: "Palavras restantes", value: stats.wordsRemaining?.toLocaleString("pt-BR") ?? "-" },
+    {
+      label: "Meta diária até o prazo",
+      value: stats.smartDailyTarget?.toLocaleString("pt-BR") ?? "-"
+    },
+  ];
 
   return (
-    <div style={{ width: '100%', height: 250 }}>
-      <ResponsiveContainer>
-        <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip formatter={(value) => [`${value} palavras`, 'Palavras']} />
-          <Bar dataKey="words" fill="#8aa7bd" radius={[6, 6, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {items.map((item, idx) => (
+        <div key={idx} className="bg-white rounded-lg border p-4 shadow-sm">
+          <p className="text-sm text-gray-600">{item.label}</p>
+          <p className="text-xl font-semibold">{item.value}</p>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getProjects, getProjectStats } from '../api/projects.js';
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { getProjects, getProjectStats } from '../api/projects.js'
 import ProgressStats from "../components/ProgressStats";
 import WeeklyProgressChart from "../components/WeeklyProgressChart";
 import WritingStats from "../components/WritingStats";
-import DailyProgressChart from "../components/DailyProgressChart";
+import ProjectComparisonChart from "../components/ProjectComparisonChart";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -19,13 +19,14 @@ export default function Dashboard() {
           setProjects(data);
           if (data.length > 0) {
             try {
-              const s = await getProjectStats(data[0].id);
+              const s = await getProjectStats(data[0].id); // usa primeiro projeto
               setStats(s);
             } catch (err) {
               console.warn("Erro ao carregar estatísticas:", err);
             }
           }
         } else {
+          console.error("Resposta inesperada da API:", data);
           setProjects([]);
         }
       })
@@ -33,7 +34,7 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Carregando...</p>;
+  if (loading) return <p>Carregando...</p>
 
   return (
     <div className="space-y-6">
@@ -53,12 +54,8 @@ export default function Dashboard() {
             const pid = p.id ?? p.projectId;
             return (
               <Link key={pid} to={`/projects/${pid}`} className="card block">
-                <h2 className="font-semibold">Projeto: {p.title ?? p.name}</h2>
-                {p.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    Descrição: {p.description}
-                  </p>
-                )}
+                <h2 className="font-semibold">{p.title ?? p.name}</h2>
+                {p.description && <p className="text-sm text-gray-600 line-clamp-2">{p.description}</p>}
                 {p.wordCountGoal ? (
                   <div className="mt-2">
                     <div className="w-full bg-gray-200 rounded h-2">
@@ -78,23 +75,29 @@ export default function Dashboard() {
       {stats && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
           <div className="card">
-            <h2 className="text-lg font-semibold mb-2">Resumo</h2>
+            <h2 className="text-lg font-semibold mb-2">Resumo Geral</h2>
             <ProgressStats stats={stats} />
           </div>
           <div className="card">
-            <h2 className="text-lg font-semibold mb-2">Progresso Diário</h2>
-            <WeeklyProgressChart history={stats.history} />
-          </div>
-          <div className="card lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-2">Estatísticas</h2>
-            <WritingStats stats={stats} />
-          </div>
-          <div className="card lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-2">Gráfico Diário</h2>
-            <DailyProgressChart daily={stats.daily} />
+            <h2 className="text-lg font-semibold mb-2">Progresso Semanal</h2>
+            <WeeklyProgressChart history={stats.history ?? []} />
           </div>
         </div>
       )}
+
+      {stats && (
+        <div className="card mt-6">
+          <h2 className="text-lg font-semibold mb-2">Estatísticas Detalhadas</h2>
+          <WritingStats stats={stats} />
+        </div>
+      )}
+
+      {projects.length > 1 && (
+        <div className="card mt-6">
+          <h2 className="text-lg font-semibold mb-2">Comparativo entre Projetos</h2>
+          <ProjectComparisonChart projects={projects} />
+        </div>
+      )}
     </div>
-  );
+  )
 }

@@ -46,7 +46,11 @@ export const createProject = async ({ title, description, wordCountGoal, deadlin
 };
 
 export const getProjectStats = async (projectId) => {
-  const { data } = await axios.get(`/projects/${projectId}/stats`);
+  const { data } = await api.get(`/projects/${projectId}/stats`);
   return data;
 };
 
+export const getProjectProgress = async (projectId) => {
+  const { data } = await axios.get(`/projects/${projectId}/progress`)
+  return data
+}
