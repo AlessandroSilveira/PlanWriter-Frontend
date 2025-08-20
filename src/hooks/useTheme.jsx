@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { ThemeContext } from "../context/ThemeContext";
 
-export default function useTheme() {
+export default function useTheme(ThemeContext) {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("theme") || "sepia";
   });

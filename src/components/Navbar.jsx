@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import useTheme from "../hooks/useTheme";
+import { Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -16,8 +17,9 @@ export default function Navbar() {
         PlanWriter
       </Link>
       <div className="flex items-center gap-4">
-        <button onClick={toggle} className="text-sm border px-2 py-1 rounded">
-          {theme === "sepia" ? "🌙 Escuro" : "☀️ Claro"}
+        <button onClick={toggle} className="text-sm border px-2 py-1 rounded flex items-center gap-2">
+          {theme === "sepia" ? <Moon size={16} /> : <Sun size={16} />}
+          {theme === "sepia" ? "Escuro" : "Claro"}
         </button>
         <button onClick={logout} className="text-sm border px-2 py-1 rounded">
           Sair
