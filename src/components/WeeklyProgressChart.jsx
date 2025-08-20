@@ -1,42 +1,48 @@
-import { Bar } from 'react-chartjs-2'
-import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js'
+import { Bar } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from "chart.js";
 
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-export default function WeeklyProgressChart({ history = [] }) {
-  if (!Array.isArray(history) || history.length === 0) {
-    return <p className="text-gray-600 text-sm">Sem progresso suficiente para exibir o gráfico.</p>
+export default function WeeklyProgressChart({ history }) {
+  if (!history || history.length === 0) {
+    return <p className="text-gray-600">Sem progresso suficiente para exibir o gráfico.</p>;
   }
 
-  const grouped = history.reduce((acc, h) => {
-    const date = new Date(h.date).toLocaleDateString('pt-BR')
-    acc[date] = (acc[date] || 0) + h.wordCount
-    return acc
-  }, {})
+  const labels = history.map((entry) =>
+    new Date(entry.date).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })
+  );
 
-  const labels = Object.keys(grouped)
-  const data = Object.values(grouped)
+  const values = history.map((entry) => entry.wordsWritten);
+
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: "Palavras escritas",
+        data: values,
+        backgroundColor: "#3b82f6",
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+      },
+    },
+  };
 
   return (
-    <div className="p-2">
-      <Bar
-        data={{
-          labels,
-          datasets: [{
-            label: 'Palavras escritas',
-            data,
-            backgroundColor: '#3d6d8e'
-          }]
-        }}
-        options={{
-          responsive: true,
-          scales: {
-            y: {
-              beginAtZero: true
-            }
-          }
-        }}
-      />
+    <div className="bg-white dark:bg-white text-black dark:text-black rounded-lg border p-4 shadow-sm">
+      <Bar data={data} options={options} />
     </div>
-  )
+  );
 }

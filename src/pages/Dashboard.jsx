@@ -73,16 +73,13 @@ export default function Dashboard() {
       )}
 
       {stats && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-          <div className="card">
+        
+          <div className="card mt-6">
             <h2 className="text-lg font-semibold mb-2">Resumo Geral</h2>
             <ProgressStats stats={stats} />
           </div>
-          <div className="card">
-            <h2 className="text-lg font-semibold mb-2">Progresso Semanal</h2>
-            <WeeklyProgressChart history={stats.history ?? []} />
-          </div>
-        </div>
+          
+       
       )}
 
       {stats && (
