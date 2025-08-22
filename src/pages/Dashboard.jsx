@@ -88,6 +88,11 @@ export default function Dashboard() {
           <WritingStats stats={stats} />
         </div>
       )}
+      {stats?.motivationMessage && (
+  <div className="mt-4 p-4 border-l-4 border-green-500 bg-green-50 text-green-800 rounded shadow-sm">
+    <p className="text-sm">{stats.motivationMessage}</p>
+  </div>
+)}
 
       {projects.length > 1 && (
         <div className="card mt-6">
