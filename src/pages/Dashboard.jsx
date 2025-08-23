@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getProjects, getProjectStats } from '../api/projects.js'
+import {
+  getProjects,
+  getProjectStats,
+  getProjectBadges
+} from '../api/projects.js'
+
 import ProgressStats from "../components/ProgressStats";
 import WeeklyProgressChart from "../components/WeeklyProgressChart";
 import WritingStats from "../components/WritingStats";
 import ProjectComparisonChart from "../components/ProjectComparisonChart";
+import BadgesList from "../components/BadgesList"; // ⬅️ NOVO
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [stats, setStats] = useState(null);
+  const [badges, setBadges] = useState([]); // ⬅️ NOVO
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -18,11 +25,14 @@ export default function Dashboard() {
         if (Array.isArray(data)) {
           setProjects(data);
           if (data.length > 0) {
+            const firstId = data[0].id;
             try {
-              const s = await getProjectStats(data[0].id); // usa primeiro projeto
+              const s = await getProjectStats(firstId);
+              const b = await getProjectBadges(firstId);
               setStats(s);
+              setBadges(b); // ⬅️ NOVO
             } catch (err) {
-              console.warn("Erro ao carregar estatísticas:", err);
+              console.warn("Erro ao carregar estatísticas ou badges:", err);
             }
           }
         } else {
@@ -34,7 +44,7 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Carregando...</p>
+  if (loading) return <p>Carregando...</p>;
 
   return (
     <div className="space-y-6">
@@ -98,6 +108,13 @@ export default function Dashboard() {
           <ProjectComparisonChart projects={projects} />
         </div>
       )}
+
+      {badges.length > 0 && (
+        <div className="card mt-6">
+          <h2 className="text-lg font-semibold mb-2">Conquistas Desbloqueadas</h2>
+          <BadgesList badges={badges} />
+        </div>
+      )}
     </div>
-  )
+  );
 }

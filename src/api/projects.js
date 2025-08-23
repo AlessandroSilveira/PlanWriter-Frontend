@@ -54,3 +54,8 @@ export const getProjectProgress = async (projectId) => {
   const { data } = await axios.get(`/projects/${projectId}/progress`)
   return data
 }
+
+export const getProjectsBadges = await (projectId) =>{
+  const {data} = await api.get(`/projects/${projectId}/badges`)
+  return data;
+}
