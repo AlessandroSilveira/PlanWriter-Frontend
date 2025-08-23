@@ -4,7 +4,7 @@ Frontend simples para conectar no backend .NET (PlanWriter).
 
 ## Requisitos
 - Node 18+
-- Backend disponível (por padrão em `https://localhost:56133/api`).
+- Backend disponível (por padrão em `http://localhost:5000/api`).
 
 ## Como rodar
 ```bash

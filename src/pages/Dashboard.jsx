@@ -83,16 +83,13 @@ export default function Dashboard() {
       )}
 
       {stats && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-          <div className="card">
+        
+          <div className="card mt-6">
             <h2 className="text-lg font-semibold mb-2">Resumo Geral</h2>
             <ProgressStats stats={stats} />
           </div>
-          <div className="card">
-            <h2 className="text-lg font-semibold mb-2">Progresso Semanal</h2>
-            <WeeklyProgressChart history={stats.history ?? []} />
-          </div>
-        </div>
+          
+       
       )}
 
       {stats && (
@@ -101,6 +98,11 @@ export default function Dashboard() {
           <WritingStats stats={stats} />
         </div>
       )}
+      {stats?.motivationMessage && (
+  <div className="mt-4 p-4 border-l-4 border-green-500 bg-green-50 text-green-800 rounded shadow-sm">
+    <p className="text-sm">{stats.motivationMessage}</p>
+  </div>
+)}
 
       {projects.length > 1 && (
         <div className="card mt-6">
