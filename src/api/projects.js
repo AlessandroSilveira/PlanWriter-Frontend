@@ -55,7 +55,7 @@ export const getProjectProgress = async (projectId) => {
   return data
 }
 
-export const getProjectsBadges = await (projectId) =>{
+export const getProjectBadges = async (projectId) => {
   const {data} = await api.get(`/projects/${projectId}/badges`)
   return data;
 }
