@@ -56,6 +56,6 @@ export const getProjectProgress = async (projectId) => {
 }
 
 export const getProjectBadges = async (projectId) => {
-  const {data} = await api.get(`/projects/${projectId}/badges`)
+  const {data} = await api.get(`/badges/projectid/${projectId}`)
   return data;
 }

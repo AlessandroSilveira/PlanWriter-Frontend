@@ -178,22 +178,7 @@ export default function ProjectDetails() {
         ) : null}
       </div>
 
-      {/* Evolução (gráfico) */}
-      <div className="card">
-        <h2 className="mb-2">Evolução</h2>
-        <ProgressChart
-          history={history}
-          currentWordCount={project?.currentWordCount ?? 0}
-          wordCountGoal={project?.wordCountGoal ?? null}
-        />
-        {project?.wordCountGoal ? (
-          <p className="text-gray-600" style={{ marginTop: 8 }}>
-            Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
-          </p>
-        ) : null}
-      </div>
-
-      {/* Formulário para adicionar progresso */}
+{/* Formulário para adicionar progresso */}
       <div className="card">
         <h2 className="mb-2">Adicionar progresso</h2>
         <form className="grid md:grid-cols-4 gap-3 items-end" onSubmit={submitProgress}>
@@ -230,6 +215,22 @@ export default function ProjectDetails() {
         </form>
         {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
       </div>
+      {/* Evolução (gráfico) */}
+      <div className="card">
+        <h2 className="mb-2">Evolução</h2>
+        <ProgressChart
+          history={history}
+          currentWordCount={project?.currentWordCount ?? 0}
+          wordCountGoal={project?.wordCountGoal ?? null}
+        />
+        {project?.wordCountGoal ? (
+          <p className="text-gray-600" style={{ marginTop: 8 }}>
+            Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
+          </p>
+        ) : null}
+      </div>
+
+      
 
       {/* Histórico */}
       <div className="card">

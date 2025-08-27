@@ -82,7 +82,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {stats && (
+      {/* {stats && (
         
           <div className="card mt-6">
             <h2 className="text-lg font-semibold mb-2">Resumo Geral</h2>
@@ -90,7 +90,7 @@ export default function Dashboard() {
           </div>
           
        
-      )}
+      )} */}
 
       {stats && (
         <div className="card mt-6">

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // ajuste se a porta for diferente
+  baseURL: 'https://localhost:56133/api', // ajuste se a porta for diferente
 })
 
 // intercepta cada request e adiciona o token
