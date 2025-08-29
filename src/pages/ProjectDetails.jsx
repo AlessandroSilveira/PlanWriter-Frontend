@@ -1,4 +1,3 @@
-// src/pages/ProjectDetails.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ProgressChart from "../components/ProgressChart.jsx";
@@ -24,17 +23,14 @@ export default function ProjectDetails() {
 
   useEffect(() => {
     const abort = new AbortController();
-
     const load = async () => {
       setLoading(true);
       setError("");
       setNotFound(false);
-
       try {
         const p = await getProject(id);
         if (abort.signal.aborted) return;
         setProject(p);
-
         try {
           const h = await getProjectHistory(id);
           if (!abort.signal.aborted) setHistory(h);
@@ -43,15 +39,11 @@ export default function ProjectDetails() {
         }
       } catch (err) {
         if (err?.response?.status === 404) setNotFound(true);
-        else {
-          setError("Falha ao carregar o projeto.");
-          console.error(err);
-        }
+        else setError("Falha ao carregar o projeto.");
       } finally {
         if (!abort.signal.aborted) setLoading(false);
       }
     };
-
     load();
     return () => abort.abort();
   }, [id]);
@@ -69,7 +61,7 @@ export default function ProjectDetails() {
     try {
       await addProgress(id, {
         wordsWritten: n,
-        date: new Date(date).toISOString(), // ISO
+        date: new Date(date).toISOString(),
         note: note || undefined,
       });
 
@@ -80,32 +72,14 @@ export default function ProjectDetails() {
         getProject(id),
         getProjectHistory(id),
       ]);
-
       if (pRes.status === "fulfilled") setProject(pRes.value);
       if (hRes.status === "fulfilled") setHistory(hRes.value);
-
-      if (pRes.status === "rejected" || hRes.status === "rejected") {
-        console.warn("Reload parcial após salvar progresso:", {
-          projectError: pRes.status === "rejected" ? pRes.reason : null,
-          historyError: hRes.status === "rejected" ? hRes.reason : null,
-        });
-      }
     } catch (err) {
-      console.error(
-        "ADD PROGRESS ERROR:",
-        err?.response?.status,
-        err?.response?.data,
-        err?.message
-      );
       const apiMsg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         (typeof err?.response?.data === "string" ? err.response.data : null);
-
-      setError(
-        apiMsg ||
-          "Falha ao adicionar progresso. Verifique autenticação e tente novamente."
-      );
+      setError(apiMsg || "Falha ao adicionar progresso. Verifique autenticação e tente novamente.");
     }
   };
 
@@ -117,7 +91,6 @@ export default function ProjectDetails() {
       setProject(p);
       setHistory(h);
     } catch (err) {
-      console.error(err?.response || err);
       setError("Falha ao excluir progresso.");
     }
   };
@@ -126,140 +99,128 @@ export default function ProjectDetails() {
 
   if (notFound)
     return (
-      <div className="container">
-        <div className="card">
-          <button onClick={() => navigate(-1)} className="button secondary mb-3">
-            ← Voltar
-          </button>
-          <h1>Projeto não encontrado</h1>
-          <p className="text-gray-600">
-            Verifique se a URL está correta e se você está autenticado.
-          </p>
-        </div>
-      </div>
+      <section className="panel section-panel">
+        <button onClick={() => navigate(-1)} className="button secondary mb-3">← Voltar</button>
+        <h1 className="h2">Projeto não encontrado</h1>
+        <p className="text-muted">Verifique se a URL está correta e se você está autenticado.</p>
+      </section>
     );
 
   const pct = Math.min(
     100,
-    Math.round(project?.progressPercent ?? 0)
+    Math.round(project?.progressPercent ?? ((project?.currentWordCount ?? 0) / (project?.wordCountGoal || 1)) * 100)
   );
 
   return (
-    <div className="container space-y-6">
-      {/* Cabeçalho do projeto */}
-      <div className="card">
-        <button onClick={() => navigate(-1)} className="button secondary mb-3">
-          ← Voltar
-        </button>
-
-        <h1>Projeto: {project?.title}</h1>
-        {project?.description && (
-          <p className="text-gray-600">Descrição: {project.description}</p>
-        )}
-
-        <div className="mt-2">
-          <div className="badge" title="Progresso do projeto">Progresso: 
-            {(project?.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
-            {(project?.wordCountGoal ?? 0).toLocaleString("pt-BR") || "—"} palavras
+    <div className="dashboard-gap">
+      {/* HERO */}
+      <header className="panel hero-panel">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <button onClick={() => navigate(-1)} className="button secondary mb-3">← Voltar</button>
+            <h1 className="h1 m-0">{project?.title}</h1>
+            {project?.description && (
+              <p className="subhead">{project.description}</p>
+            )}
           </div>
+          {project?.wordCountGoal ? (
+            <div className="min-w-[220px]">
+              <div className="kpi kpi--lg">
+                <div className="label">Progresso</div>
+                <div className="value">{pct}%</div>
+                <div className="progress mt-2">
+                  <div className="fill" style={{ width: `${pct}%` }} />
+                </div>
+                <div className="hint mt-1">
+                  {(project?.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
+                  {project?.wordCountGoal?.toLocaleString("pt-BR")} palavras
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
+      </header>
 
-        {project?.wordCountGoal ? (
-          <div className="progress mt-2" aria-label="Barra de progresso">
-            <div
-              className="fill"
-              style={{ width: `${pct}%` }}
-              aria-valuenow={pct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              role="progressbar"
+      {/* FORM + HISTÓRICO + GRÁFICO */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+        <section className="panel section-panel">
+          <h2 className="section-title">Adicionar progresso</h2>
+          <form className="grid md:grid-cols-4 gap-3 items-end mt-3" onSubmit={submitProgress}>
+            <div className="md:col-span-2">
+              <label className="kicker">Palavras escritas</label>
+              <input
+                type="number"
+                min="1"
+                value={wordsWritten}
+                onChange={(e) => setWordsWritten(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="kicker">Data/Hora</label>
+              <input
+                type="datetime-local"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="md:col-span-4">
+              <label className="kicker">Nota (opcional)</label>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ex.: Escrevi cena do capítulo 5"
+              />
+            </div>
+            <div className="md:col-span-4">
+              <button type="submit" className="button">Adicionar</button>
+            </div>
+          </form>
+          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+        </section>
+
+        <aside className="panel section-panel">
+          <h2 className="section-title">Evolução</h2>
+          <div className="mt-3">
+            <ProgressChart
+              history={history}
+              currentWordCount={project?.currentWordCount ?? 0}
+              wordCountGoal={project?.wordCountGoal ?? null}
             />
+            {project?.wordCountGoal ? (
+              <p className="text-xs text-muted mt-2">
+                Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
+              </p>
+            ) : null}
           </div>
-        ) : null}
+        </aside>
       </div>
 
-{/* Formulário para adicionar progresso */}
-      <div className="card">
-        <h2 className="mb-2">Adicionar progresso</h2>
-        <form className="grid md:grid-cols-4 gap-3 items-end" onSubmit={submitProgress}>
-          <div className="md:col-span-2">
-            <label className="block text-sm mb-1">Palavras escritas</label>
-            <input
-              type="number"
-              min="1"
-              value={wordsWritten}
-              onChange={(e) => setWordsWritten(e.target.value)}
-              required
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm mb-1">Data/Hora</label>
-            <input
-              type="datetime-local"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
-          <div className="md:col-span-4">
-            <label className="block text-sm mb-1">Nota (opcional)</label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Ex.: Escrevi cena do capítulo 5"
-            />
-          </div>
-          <div className="md:col-span-4">
-            <button type="submit" className="button">Adicionar</button>
-          </div>
-        </form>
-        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-      </div>
-      {/* Evolução (gráfico) */}
-      <div className="card">
-        <h2 className="mb-2">Evolução</h2>
-        <ProgressChart
-          history={history}
-          currentWordCount={project?.currentWordCount ?? 0}
-          wordCountGoal={project?.wordCountGoal ?? null}
-        />
-        {project?.wordCountGoal ? (
-          <p className="text-gray-600" style={{ marginTop: 8 }}>
-            Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
-          </p>
-        ) : null}
-      </div>
-
-      
-
-      {/* Histórico */}
-      <div className="card">
-        <h2 className="mb-3">Histórico</h2>
+      <section className="panel section-panel">
+        <h2 className="section-title">Histórico</h2>
         {!history?.length ? (
-          <p className="text-gray-600">Sem entradas ainda.</p>
+          <p className="text-muted mt-2">Sem entradas ainda.</p>
         ) : (
-          <ul className="history">
+          <ul className="space-y-2 mt-3">
             {history.map((h, idx) => (
-              <li key={h.id ?? idx}>
+              <li key={h.id ?? idx} className="card card--lg flex items-center justify-between">
                 <span>
-                  {new Date(h.date).toLocaleString("pt-BR")} —{" "}
-                  <b>{(h.wordsWritten ?? 0).toLocaleString("pt-BR")}</b> palavras
+                  {new Date(h.date).toLocaleString()} — <b>{h.wordsWritten}</b> palavras
                   {h.note || h.notes ? (
-                    <span className="text-gray-600"> — {h.note ?? h.notes}</span>
+                    <span className="text-muted text-sm"> — {h.note ?? h.notes}</span>
                   ) : null}
                 </span>
                 {h.id ? (
-                  <button className="button secondary" onClick={() => removeProgress(h.id)}>
-                    Excluir
-                  </button>
+                  <button className="button secondary" onClick={() => removeProgress(h.id)}>Excluir</button>
                 ) : (
-                  <span className="text-xs text-gray-500"></span>
+                  <span className="text-xs text-muted">sem id</span>
                 )}
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,57 +1,57 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login.jsx'
-import Register from './pages/Register.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import ProjectDetails from './pages/ProjectDetails.jsx'
-import NewProject from './pages/NewProject.jsx' // ✅ IMPORTAÇÃO
-import PrivateRoute from './components/PrivateRoute.jsx'
-import Layout from './components/Layout.jsx'
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import NewProject from "./pages/NewProject.jsx";
+import ProjectDetails from "./pages/ProjectDetails.jsx";
+import PrivateRoute from "./components/PrivateRoute.jsx";
+import Navbar from "./components/Navbar.jsx";
 
 export default function App() {
+  const location = useLocation();
+  const hideNav = location.pathname === "/login" || location.pathname === "/register";
+
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] font-serif">
-      <Routes>
-        {/* rotas públicas */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      {!hideNav && <Navbar />}
 
-        {/* rotas privadas com Layout */}
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <Layout>
+      {/* Container central da aplicação */}
+      <div className="app-container max-w-[1160px] mx-auto px-4">
+        <Routes>
+          {/* públicas */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* privadas */}
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
                 <Dashboard />
-              </Layout>
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/projects/new" // ✅ ANTES do :id
-          element={
-            <PrivateRoute>
-              <Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/projects/new"
+            element={
+              <PrivateRoute>
                 <NewProject />
-              </Layout>
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/projects/:id"
-          element={
-            <PrivateRoute>
-              <Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/projects/:id"
+            element={
+              <PrivateRoute>
                 <ProjectDetails />
-              </Layout>
-            </PrivateRoute>
-          }
-        />
+              </PrivateRoute>
+            }
+          />
 
-        {/* fallback */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* fallback */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </div>
     </div>
-  )
+  );
 }

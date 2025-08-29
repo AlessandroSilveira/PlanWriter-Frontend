@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import useTheme from "../hooks/useTheme";
-import { Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -8,22 +7,33 @@ export default function Navbar() {
 
   const logout = () => {
     localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     navigate("/login");
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b shadow-sm">
-      <Link to="/" className="font-bold text-xl text-accent">
-        PlanWriter
-      </Link>
-      <div className="flex items-center gap-4">
-        <button onClick={toggle} className="text-sm border px-2 py-1 rounded flex items-center gap-2">
-          {theme === "sepia" ? <Moon size={16} /> : <Sun size={16} />}
-          {theme === "sepia" ? "Escuro" : "Claro"}
-        </button>
-        <button onClick={logout} className="text-sm border px-2 py-1 rounded">
-          Sair
-        </button>
+    <header className="border-b bg-[color:var(--bg)]/85 backdrop-blur sticky top-0 z-40">
+      <div className="app-container max-w-[1160px] mx-auto px-4 flex items-center justify-between py-3">
+        {/* Branding */}
+        <Link to="/" className="flex items-center gap-3 no-underline">
+          <div className="h-9 w-9 rounded-xl bg-[color:var(--brand)] text-white grid place-items-center font-extrabold shadow-sm">
+            PW
+          </div>
+          <div className="leading-tight">
+            <div className="font-extrabold text-lg">PlanWriter</div>
+            <div className="text-[13px] text-[color:var(--muted)] tracking-wide">
+              FOCO, CONSISTÊNCIA E RITMO
+            </div>
+          </div>
+        </Link>
+
+        {/* Ações */}
+        <div className="flex items-center gap-3">
+          <button onClick={toggle} className="button secondary">
+            {theme === "sepia" ? "🌙 Escuro" : "☀️ Claro"}
+          </button>
+          <button onClick={logout} className="button">Sair</button>
+        </div>
       </div>
     </header>
   );

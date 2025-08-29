@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ajustes leves */
+.card { @apply p-5; }
+
 /* Regras base de UI */
 :root {
   color-scheme: light;

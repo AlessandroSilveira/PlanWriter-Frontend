@@ -1,102 +1,199 @@
-/* --- Tema Sépia Confortável --- */
+/* ---------- PlanWriter — Tema Pro para Escritores ---------- */
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Inter:wght@400;600;700;800&display=swap");
+
 :root {
-  --bg: #f2eee6;
-  --bg-card: #f9f6ef;
-  --text: #1b1815;
-  --muted: #6e665d;
-  --line: #e3ded5;
+  --bg: #f4efe6;
+  --surface: #faf7f1;
+  --panel: #fffaf2;
+  --ink: #1e1a15;
+  --muted: #6f665c;
+  --line: #e6ddd0;
 
-  --brand: #3d6d8e;
-  --brand-ink: #1e3b50;
-  --accent: #b88b62;
-  --accent-ink: #4f3a29;
+  --brand: #315b73;
+  --brand-ink: #214255;
+  --accent: #b88255;
+  --accent-ink: #4b3526;
 
-  --radius: 14px;
-  --shadow: 0 8px 20px rgba(30, 26, 20, 0.08);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 12px 28px rgba(25,22,18,.08);
+  --shadow-sm: 0 6px 16px rgba(25,22,18,.06);
 
   --font-serif: "Merriweather", Georgia, "Times New Roman", serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Aplicação global */
-html, body {
-  background-color: var(--bg) !important;
-  color: var(--text);
+/* Dark confortável (ativado quando <html data-theme="dark">) */
+html[data-theme="dark"] {
+  --bg: #12110f;
+  --surface: #171613;
+  --panel: #1c1a17;
+  --ink: #efe7db;
+  --muted: #bfb7a8;
+  --line: #26231f;
+
+  --brand: #7ea6bf;
+  --brand-ink: #cfe0ea;
+  --accent: #c89c76;
+}
+
+/* Fundo com textura sutil e tipografia editorial */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 25% -10%, rgba(184,130,85,.07), transparent 70%),
+    radial-gradient(900px 500px at 120% 120%, rgba(49,91,115,.08), transparent 60%),
+    var(--bg);
   font-family: var(--font-serif);
   line-height: 1.8;
+  letter-spacing: .01em;
 }
 
-/* Container de leitura */
-.container {
-  max-width: 880px;
-  margin: 0 auto;
+/* Utilitárias do layout */
+.app-container { max-width: 1220px; margin: 0 auto; padding: 0 20px; }
+.navbar {
+  position: sticky; top: 0; z-index: 50;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface) 30%, transparent));
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
 }
 
-/* Cartões */
+/* Cartões e painéis */
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--line);
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius) !important;
   box-shadow: var(--shadow);
+}
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+
+/* Controles */
+input, textarea, select {
+  background: var(--panel) !important; border: 1px solid var(--line) !important;
+  border-radius: 12px !important; padding: .7rem .9rem !important;
+  color: var(--ink) !important; outline: none !important;
+  transition: box-shadow .2s, border-color .2s; font-family: var(--font-sans);
+  width: 100%;
+}
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, white); }
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Botões */
+.button, button {
+  background: var(--brand); color: #f6efe6; border: 1px solid var(--brand-ink);
+  border-radius: 12px; padding: .6rem .9rem; font-family: var(--font-sans); font-weight: 700;
+  box-shadow: var(--shadow-sm); transition: transform .06s ease, opacity .15s;
+}
+.button:hover, button:hover { transform: translateY(-1px); opacity: .96; }
+.button.secondary { background: transparent; color: var(--brand); border-color: color-mix(in srgb, var(--brand) 50%, var(--line)); }
+
+/* Progresso */
+.progress { height: 8px; background: #e7dfd2; border-radius: 999px; overflow: hidden; }
+.progress > .fill { height: 8px; background: linear-gradient(90deg, #7ea0ba, #b88255); }
+
+/* KPIs */
+.kpi {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 14px; box-shadow: var(--shadow-sm);
+}
+.kpi .label { color: var(--muted); font: 600 12px var(--font-sans); text-transform: uppercase; letter-spacing: .08em; }
+.kpi .value { font: 800 22px var(--font-serif); }
+.kpi .hint  { color: var(--muted); font: 600 12px var(--font-sans); }
+
+/* Ring (progresso cônico) */
+.ring {
+  --pct: 0.62;
+  width: 120px; height: 120px; border-radius: 50%;
+  background:
+    radial-gradient(closest-side, var(--panel) 78%, transparent 80% 100%),
+    conic-gradient(var(--brand) calc(var(--pct) * 360deg), #e1d5c4 0);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--line);
+  display: grid; place-items: center; font: 800 20px var(--font-serif);
+  color: var(--brand-ink);
+}
+.ring small { display: block; font: 600 11px var(--font-sans); color: var(--muted); }
+
+/* Tipografia utilitária */
+.h1 { font: 900 clamp(1.4rem, 1.2rem + 1.2vw, 2rem) var(--font-serif); }
+.h2 { font: 800 1.1rem var(--font-serif); }
+.kicker { font: 700 12px var(--font-sans); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.text-muted { color: var(--muted); }
+
+/* Painéis “arejados” (todos os blocos do dashboard) */
+.section-panel {
+  padding: 22px 26px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Cards de projeto mais confortáveis */
+.card--lg {
+  padding: 16px;
   border-radius: var(--radius);
 }
 
-/* Inputs */
-input, textarea, select {
-  background: #f6f2ea;
-  border-color: #d9d2c6;
-}
-input:focus, textarea:focus, select:focus {
-  background: #fffaf2;
-  border-color: #a77a54;
-  box-shadow: 0 0 0 3px rgba(186, 140, 99, .18);
+/* Título de seção */
+.section-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
-/* Barra de progresso */
-.progress { background: #e6e0d6; }
-.progress > .fill {
-  background: linear-gradient(90deg, #8aa7bd, #b88b62);
+/* Barrinha de progresso um pouco mais alta */
+.progress { height: 8px; }
+.progress .fill { height: 8px; }
+
+/* Grid padrão entre seções maiores */
+.dashboard-gap > * + * { margin-top: 24px; }
+
+.hero-panel { padding: 22px 26px; border-radius: var(--radius); box-shadow: var(--shadow); }
+.kpi--lg { padding: 18px; border-radius: var(--radius-sm); }
+.subhead { margin-top:4px; font-family:var(--font-sans); font-weight:500; font-size:.95rem; color:var(--muted); }
+
+
+/* ===== Escala tipográfica e largura do conteúdo ===== */
+:root {
+  --content-max: 1160px;   /* mais largo que 5xl do Tailwind */
+  --base-size: 17px;       /* corpo maior (era ~16px) */
+  --h1-size: 2.25rem;      /* ~36px */
+  --h2-size: 1.35rem;      /* ~22px */
+  --kpi-value: 1.6rem;     /* números dos cards maiores */
 }
 
-/* Texto secundário */
-.text-gray-600 { color: #7a736a; }
-
-/* Botões */
-button {
-  background: #3d6d8e;
-  border-color: #3d6d8e;
-  color: #f7f4ee;
-  box-shadow: 0 6px 14px rgba(61, 109, 142, .18);
-}
-button:hover {
-  background: #345b75;
+body {
+  font-size: var(--base-size);
+  line-height: 1.75;
 }
 
-/* Dark Mode automático */
-@media (prefers-color-scheme: dark) {
-  /* :root {
-    --bg: #141311;
-    --bg-card: #191815;
-    --text: #ece7de;
-    --muted: #b7b1a6;
-    --line: #2a2723;
-
-    --brand: #7fb4ff;
-    --accent: #c9a07b;
-    --shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  } */
-input, textarea, select {
-  background: #fdfaf5;         /* tom claro e suave */
-  color: #1b1815;
-  border: 1px solid #d9d2c6;
+/* container central padrão da app */
+.app-container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 16px;
 }
 
-input:focus, textarea:focus, select:focus {
-  background: #fffdf9;         /* realce mais claro ao focar */
-  border-color: #a77a54;
-  box-shadow: 0 0 0 3px rgba(186, 140, 99, .18);
-}
+/* headings utilitários (você já usa .h1/.h2 no JSX) */
+.h1 { font-size: var(--h1-size); line-height: 1.15; letter-spacing: -0.015em; }
+.h2 { font-size: var(--h2-size); line-height: 1.25; letter-spacing: -0.01em; }
 
-  .progress {
-    background: #26231f;
-  }
-}
+/* painéis mais “almofadados” (hero e seções) */
+.hero-panel { padding: 28px 30px; }        /* ↑ um pouco em relação à versão anterior */
+.section-panel { padding: 24px 26px; }     /* todas as caixas do dashboard */
+
+/* KPIs mais legíveis */
+.kpi--lg { padding: 18px; }
+.kpi .label { font-size: .78rem; }
+.kpi .value { font-size: var(--kpi-value); }
+
+/* barra de progresso um pouco mais alta e suave */
+.progress { height: 8px; }
+.progress .fill { height: 8px; }
