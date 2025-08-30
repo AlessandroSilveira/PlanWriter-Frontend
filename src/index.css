@@ -1,4 +1,7 @@
-@import "./theme/writer.css";
+@import "./theme/planwriter-theme.css";
+
+/* garante altura total e aplicação do tema */
+html, body, #root { height: 100%; }
 
 @tailwind base;
 @tailwind components;

@@ -1,7 +1,16 @@
 /* ---------- PlanWriter — Tema Pro para Escritores ---------- */
 @import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Inter:wght@400;600;700;800&display=swap");
 
+/* ---------- PlanWriter — Tema Pro para Escritores ---------- */
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Inter:wght@400;600;700;800&display=swap");
+
 :root {
+  --bg: #f4efe6;
+  --surface: #faf7f1;
+  --panel: #fffaf2;
+  --ink: #1e1a15;
+  --muted: #6f665c;
+  --line: #e6ddd0;
   --bg: #f4efe6;
   --surface: #faf7f1;
   --panel: #fffaf2;
@@ -13,13 +22,22 @@
   --brand-ink: #214255;
   --accent: #b88255;
   --accent-ink: #4b3526;
+  --brand: #315b73;
+  --brand-ink: #214255;
+  --accent: #b88255;
+  --accent-ink: #4b3526;
 
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 12px 28px rgba(25,22,18,.08);
+  --shadow-sm: 0 6px 16px rgba(25,22,18,.06);
   --radius: 16px;
   --radius-sm: 12px;
   --shadow: 0 12px 28px rgba(25,22,18,.08);
   --shadow-sm: 0 6px 16px rgba(25,22,18,.06);
 
   --font-serif: "Merriweather", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -46,8 +64,32 @@ body {
     radial-gradient(1200px 600px at 25% -10%, rgba(184,130,85,.07), transparent 70%),
     radial-gradient(900px 500px at 120% 120%, rgba(49,91,115,.08), transparent 60%),
     var(--bg);
+/* Dark confortável (ativado quando <html data-theme="dark">) */
+html[data-theme="dark"] {
+  --bg: #12110f;
+  --surface: #171613;
+  --panel: #1c1a17;
+  --ink: #efe7db;
+  --muted: #bfb7a8;
+  --line: #26231f;
+
+  --brand: #7ea6bf;
+  --brand-ink: #cfe0ea;
+  --accent: #c89c76;
+}
+
+/* Fundo com textura sutil e tipografia editorial */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 25% -10%, rgba(184,130,85,.07), transparent 70%),
+    radial-gradient(900px 500px at 120% 120%, rgba(49,91,115,.08), transparent 60%),
+    var(--bg);
   font-family: var(--font-serif);
   line-height: 1.8;
+  letter-spacing: .01em;
   letter-spacing: .01em;
 }
 
@@ -58,10 +100,21 @@ body {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface) 30%, transparent));
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
+/* Utilitárias do layout */
+.app-container { max-width: 1220px; margin: 0 auto; padding: 0 20px; }
+.navbar {
+  position: sticky; top: 0; z-index: 50;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface) 30%, transparent));
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
 }
 
 /* Cartões e painéis */
+/* Cartões e painéis */
 .card {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius) !important;
   background: var(--surface) !important;
   border: 1px solid var(--line) !important;
   border-radius: var(--radius) !important;
@@ -71,7 +124,12 @@ body {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
 }
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
 
+/* Controles */
 /* Controles */
 input, textarea, select {
   background: var(--panel) !important; border: 1px solid var(--line) !important;
@@ -79,14 +137,26 @@ input, textarea, select {
   color: var(--ink) !important; outline: none !important;
   transition: box-shadow .2s, border-color .2s; font-family: var(--font-sans);
   width: 100%;
+  background: var(--panel) !important; border: 1px solid var(--line) !important;
+  border-radius: 12px !important; padding: .7rem .9rem !important;
+  color: var(--ink) !important; outline: none !important;
+  transition: box-shadow .2s, border-color .2s; font-family: var(--font-sans);
+  width: 100%;
 }
 input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, white); }
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, white); }
 input:focus, textarea:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Botões */
+.button, button {
+  background: var(--brand); color: #f6efe6; border: 1px solid var(--brand-ink);
+  border-radius: 12px; padding: .6rem .9rem; font-family: var(--font-sans); font-weight: 700;
+  box-shadow: var(--shadow-sm); transition: transform .06s ease, opacity .15s;
 .button, button {
   background: var(--brand); color: #f6efe6; border: 1px solid var(--brand-ink);
   border-radius: 12px; padding: .6rem .9rem; font-family: var(--font-sans); font-weight: 700;
@@ -109,7 +179,7 @@ input:focus, textarea:focus, select:focus {
 .kpi .hint  { color: var(--muted); font: 600 12px var(--font-sans); }
 
 /* Ring (progresso cônico) */
-.ring {
+/* .ring {
   --pct: 0.62;
   width: 120px; height: 120px; border-radius: 50%;
   background:
@@ -119,7 +189,7 @@ input:focus, textarea:focus, select:focus {
   display: grid; place-items: center; font: 800 20px var(--font-serif);
   color: var(--brand-ink);
 }
-.ring small { display: block; font: 600 11px var(--font-sans); color: var(--muted); }
+.ring small { display: block; font: 600 11px var(--font-sans); color: var(--muted); } */
 
 /* Tipografia utilitária */
 .h1 { font: 900 clamp(1.4rem, 1.2rem + 1.2vw, 2rem) var(--font-serif); }

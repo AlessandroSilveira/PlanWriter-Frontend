@@ -1,16 +1,18 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="pt-BR" data-theme="sepia">
   <head>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Merriweather&display=swap" rel="stylesheet">
-
-
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PlanWriter</title>
+    <script>
+      // restaura tema salvo ANTES de carregar a app (evita "piscar" e garante o tema)
+      try {
+        const saved = localStorage.getItem("pw_theme");
+        if (saved) document.documentElement.setAttribute("data-theme", saved);
+      } catch {}
+    </script>
   </head>
-  <body class="bg-gray-50">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

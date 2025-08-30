@@ -41,7 +41,7 @@ export default function Dashboard() {
     const clamped = Math.max(0, Math.min(100, pct));
     const varPct = clamped / 100;
     return (
-      <div className="ring" style={{ ["--pct"]: varPct }}>
+      <div className="ring2" >
         {clamped}%
         <small>concluído</small>
       </div>
@@ -55,67 +55,48 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="dashboard-gap">
+    <main className="dashboard-gap">
       {/* HEADER com respiro no CTA */}
-      <header className="panel hero-panel">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="min-w-0">
-              <h1 className="h1 m-0">Bem-vindo de volta, escritor.</h1>
-              <p className="subhead">Mantenha o ritmo — cada sessão conta.</p>
-            </div>
-            <Link to="/projects/new" className="button md:ml-auto mt-2 md:mt-0 shrink-0">
-              + Novo projeto
-            </Link>
-          </div>
+     
 
-          {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="kpi kpi--lg">
-                <div className="label">Total</div>
-                <div className="value">{(stats.totalWords ?? 0).toLocaleString("pt-BR")}</div>
-                <div className="hint">palavras</div>
-              </div>
-              <div className="kpi kpi--lg">
-                <div className="label">Média/dia</div>
-                <div className="value">{Math.round(stats.averagePerDay ?? 0)}</div>
-                <div className="hint">últimos dias</div>
-              </div>
-              <div className="kpi kpi--lg">
-                <div className="label">Melhor dia</div>
-                <div className="value">{stats.bestDay?.words?.toLocaleString("pt-BR") ?? 0}</div>
-                <div className="hint">
-                  {stats.bestDay?.date ? new Date(stats.bestDay.date).toLocaleDateString("pt-BR") : "—"}
-                </div>
-              </div>
-              <div className="kpi kpi--lg">
-                <div className="label">Sequência</div>
-                <div className="value">{stats.activeDays ?? 0}</div>
-                <div className="hint">dias ativos</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
+ <header className="hero " >
+    <div className="container hero-inner">
+      <div>
+        <h1>Bem-vindo de volta, escritor.</h1>
+        <p>Você escreveu <strong>1.420</strong> palavras ontem. Continue no ritmo — sua melhor sequência é de <strong>5 dias</strong>.</p>
+      </div>
+      {stats && (
+      <div className="summary">
+        <div className="kpi"><div className="label">Total</div><div className="value">{(stats.totalWords ?? 0).toLocaleString("pt-BR")}</div><div className="hint">palavras</div></div>
+        <div className="kpi"><div className="label">Média/dia</div><div className="value">{Math.round(stats.averagePerDay ?? 0)}</div><div className="hint">últimos dias</div></div>
+        <div className="kpi"><div className="label">Melhor dia</div><div className="value">{stats.bestDay?.words?.toLocaleString("pt-BR") ?? 0}</div><div className="hint">{stats.bestDay?.date ? new Date(stats.bestDay.date).toLocaleDateString("pt-BR") : "—"}</div></div>
+        <div className="kpi"><div className="label">Sequência</div><div className="value">{stats.activeDays ?? 0}</div><div className="hint">dias consecutivos</div></div>
+      </div>     
+   
+     )}
+    </div>
+  </header>
+
+
 
       {/* Grade principal: projetos + meta do mês */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+      <main className="container grid">
         {/* Lista de projetos */}
-        <section className="panel section-panel">
-          <div className="flex items-end justify-between">
-            <h2 className="section-title">Seus projetos</h2>
-            {projects?.length > 0 && (
+        <section className="panel">
+         
+            <h2 >Seus projetos</h2>
+            {/* {projects?.length > 0 && (
               <span className="text-muted text-sm">{projects.length} projeto(s)</span>
-            )}
-          </div>
+            )} */}
+          
 
           {!projects?.length ? (
             <div className="card card--lg text-center py-10 mt-3">
-              <p className="text-muted mb-4">Você ainda não tem projetos.</p>
+              <p className="meta">Você ainda não tem projetos.</p>
               <Link to="/projects/new" className="button">Criar primeiro projeto</Link>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 gap-4 mt-4">
+            <div className="proj-grid">
               {projects.map((p) => {
                 const pid = p.id ?? p.projectId;
                 const pct = Math.min(
@@ -125,25 +106,25 @@ export default function Dashboard() {
 
                 return (
                   <Link key={pid} to={`/projects/${pid}`} className="no-underline">
-                    <div className="card card--lg hover:opacity-95 transition">
+                    <div className="proj">
                       <div className="kicker">{p?.genre ?? "Projeto"}</div>
-                      <div className="font-serif font-extrabold text-lg mt-1">
+                      <div className="title">
                         {p.title ?? p.name}
                       </div>
                       {p.description && (
-                        <p className="text-muted mt-1 line-clamp-2">{p.description}</p>
+                        <p className="meta">{p.description}</p>
                       )}
-
-                      {p.wordCountGoal ? (
-                        <div className="mt-3">
-                          <div className="progress">
-                            <div className="fill" style={{ width: `${pct}%` }} />
-                          </div>
-                          <p className="text-muted text-xs mt-1">
+                      <p className="meta">
                             {(p.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
                             {p.wordCountGoal?.toLocaleString("pt-BR")} palavras
                           </p>
+                      {p.wordCountGoal ? (
+                        <div className="progress">
+                          
+                         
+                            <div className="fill" style={{ width: `${pct}%` }} />
                         </div>
+                        
                       ) : null}
                     </div>
                   </Link>
@@ -153,8 +134,11 @@ export default function Dashboard() {
           )}
         </section>
 
+
+      
+
         {/* Meta do mês / anel de progresso para o primeiro projeto */}
-        <aside className="panel section-panel">
+        {/* <aside className="panel section-panel">
           <h2 className="section-title">Meta do mês</h2>
           <p className="text-muted -mt-1">Progresso no projeto selecionado</p>
           {first ? (
@@ -168,7 +152,7 @@ export default function Dashboard() {
                   </div>
                   <div className="hint">palavras</div>
                 </div>
-                <div className="kpi kpi--lg">
+                <div className="kpi ">
                   <div className="label">Meta</div>
                   <div className="value">
                     {(first.wordCountGoal ?? 0).toLocaleString("pt-BR")}
@@ -180,28 +164,67 @@ export default function Dashboard() {
           ) : (
             <div className="text-muted mt-2">Crie um projeto para acompanhar a meta.</div>
           )}
+        </aside> */}
+{/* Meta do mês / anel de progresso para o primeiro projeto */}
+        <aside className="panel">
+          <h2>Meta do mês</h2>
+          <p className="sub">Progresso no projeto selecionado</p>
+          {first ? (
+             <div className="upperkpi" >
+            
+           
+              <Ring pct={progressPercent} />
+             <div>
+                  <div className="kpi"  >
+                    <div className="label">Atual</div>
+                    <div className="value">
+                      {(first.currentWordCount ?? 0).toLocaleString("pt-BR")}
+                    </div>
+                    <div className="hint">palavras</div>
+                  </div>
+                  <div className="kpi kpi--lg" >
+                    <div className="label">Meta</div>
+                    <div className="value">
+                      {(first.wordCountGoal ?? 0).toLocaleString("pt-BR")}
+                    </div>
+                    <div className="hint">palavras</div>
+                  </div> 
+                </div>             
+            </div>
+          ) : (
+            <div className="text-muted mt-2">Crie um projeto para acompanhar a meta.</div>
+          )}
         </aside>
-      </div>
+
+
+
+      </main>
+      <main className="container grid">
 
       {/* Estatísticas detalhadas do primeiro projeto */}
       {stats && (
-        <section className="panel section-panel">
+      
+        <section className="panel2">
           <h2 className="section-title">Estatísticas detalhadas</h2>
           <div className="mt-3">
             <WritingStats stats={stats} />
           </div>
         </section>
+       
       )}
 
       {/* Comparativo entre projetos */}
       {projects.length > 1 && (
-        <section className="panel section-panel">
+      
+        <section className="panel2">
           <h2 className="section-title">Comparativo entre Projetos</h2>
           <div className="mt-3">
             <ProjectComparisonChart projects={projects} />
           </div>
         </section>
+      
       )}
-    </div>
+      </main>
+    </main>
   );
 }
