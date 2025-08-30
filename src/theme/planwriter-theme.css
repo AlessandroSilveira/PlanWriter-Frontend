@@ -162,9 +162,9 @@
     .fill { height: 8px; background: linear-gradient(90deg, #7ea0ba, #b88255); width: 62%; }
 
     /* Conic Ring */
-    .ring2 {
+       .ring2 {
       --pct: 0.62;
-      width: 130px; height: 130px; border-radius: 50%;
+      width: 120px; height: 120px; border-radius: 50%;
       background:
         radial-gradient(closest-side, var(--panel) 78%, transparent 80% 100%),
         conic-gradient(var(--brand) calc(var(--pct) * 360deg), #e1d5c4 0);
@@ -172,7 +172,7 @@
       display: grid; place-items: center; font: 800 20px var(--font-serif);
       color: var(--brand-ink);
     }
-    .ring2 small { display: block; font: 400 12px var(--font-sans); color: var(--muted); }
+    .ring2 small { display: block; font: 600 11px var(--font-sans); color: var(--muted); }
 
     /* Form */
     .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }

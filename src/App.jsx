@@ -16,7 +16,7 @@ export default function App() {
       {!hideNav && <Navbar />}
 
       {/* Container central da aplicação */}
-      <div className="app-container max-w-[1160px] mx-auto px-4">
+      <div className="app-container max-w-[1600px] mx-auto px-4">
         <Routes>
           {/* públicas */}
           <Route path="/login" element={<Login />} />

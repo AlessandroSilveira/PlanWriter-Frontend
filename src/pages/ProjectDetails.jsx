@@ -112,10 +112,14 @@ export default function ProjectDetails() {
   );
 
   return (
+    
     <div className="dashboard-gap">
+        <main className="flex-grow dashboard-gap">
       {/* HERO */}
-      <header className="panel hero-panel">
-        <div className="flex items-start justify-between gap-3">
+      <header className="hero">
+         <div className="container hero-inner">
+          <div className="container grid">      
+        
           <div className="min-w-0">
             <button onClick={() => navigate(-1)} className="button secondary mb-3">← Voltar</button>
             <h1 className="h1 m-0">{project?.title}</h1>
@@ -138,11 +142,13 @@ export default function ProjectDetails() {
               </div>
             </div>
           ) : null}
+          </div>
         </div>
       </header>
+      </main>
 
       {/* FORM + HISTÓRICO + GRÁFICO */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+      <div className="container grid">
         <section className="panel section-panel">
           <h2 className="section-title">Adicionar progresso</h2>
           <form className="grid md:grid-cols-4 gap-3 items-end mt-3" onSubmit={submitProgress}>
@@ -179,25 +185,7 @@ export default function ProjectDetails() {
           </form>
           {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
         </section>
-
-        <aside className="panel section-panel">
-          <h2 className="section-title">Evolução</h2>
-          <div className="mt-3">
-            <ProgressChart
-              history={history}
-              currentWordCount={project?.currentWordCount ?? 0}
-              wordCountGoal={project?.wordCountGoal ?? null}
-            />
-            {project?.wordCountGoal ? (
-              <p className="text-xs text-muted mt-2">
-                Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
-              </p>
-            ) : null}
-          </div>
-        </aside>
-      </div>
-
-      <section className="panel section-panel">
+ <section className="panel section-panel">
         <h2 className="section-title">Histórico</h2>
         {!history?.length ? (
           <p className="text-muted mt-2">Sem entradas ainda.</p>
@@ -221,6 +209,49 @@ export default function ProjectDetails() {
           </ul>
         )}
       </section>
+
+
+      </div>
+
+      <main className="flex-grow dashboard-gap">
+        {/* <div className="container">
+           <section className="panel2">
+          <h2 className="section-title">Evolução</h2>
+          <div className="mt-3">
+            <ProgressChart
+              history={history}
+              currentWordCount={project?.currentWordCount ?? 0}
+              wordCountGoal={project?.wordCountGoal ?? null}
+            />
+            {project?.wordCountGoal ? (
+              <p className="text-xs text-muted mt-2">
+                Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
+              </p>
+            ) : null}
+           
+          </div>
+           </section>
+        </div> */}
+ <div className="container">
+            <section className="panel2">
+              <h2 className="section-title">Comparativo entre Projetos</h2>
+              <div className="mt-3">
+                 <ProgressChart
+              history={history}
+              currentWordCount={project?.currentWordCount ?? 0}
+              wordCountGoal={project?.wordCountGoal ?? null}
+            />
+             {project?.wordCountGoal ? (
+              <p className="text-xs text-muted mt-2">
+                Meta: {project.wordCountGoal.toLocaleString("pt-BR")} palavras
+              </p>
+            ) : null}
+              </div>
+            </section>
+          </div>
+
+</main>
+     
     </div>
   );
 }

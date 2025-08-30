@@ -16,6 +16,13 @@ export default function Navbar() {
     if (saved) document.documentElement.setAttribute("data-theme", saved);
   }
 
+  const handleThemeToggle = () => {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', current === 'dark' ? 'sepia' : 'dark');
+  };
+
+
   const logout = () => {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
@@ -36,7 +43,7 @@ export default function Navbar() {
       <div className="nav-actions">
         <div className="theme-toggle" id="themeToggle">
           <span>Claro</span>
-          <div className="switch"><div className="knob"></div></div>
+          <div className="switch" onClick={handleThemeToggle}><div className="knob"></div></div>
           <span>Escuro</span>
         </div>
         <button className="btn">Sair</button>
