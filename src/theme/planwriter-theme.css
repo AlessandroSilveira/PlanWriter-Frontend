@@ -138,7 +138,7 @@
       background: var(--surface); border: 1px solid var(--line);
       border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px;
       margin-top: 15px;
-     width: auto;
+      width: auto;
     }
     .panel2 h2 { font: 800 1.5rem var(--font-serif); margin: 0 0 10px; }
     .panel2 .sub { color: var(--muted); font: 800 15px var(--font-sans); margin-top: -4px; }

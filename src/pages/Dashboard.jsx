@@ -199,7 +199,7 @@ export default function Dashboard() {
 
 
       </main>
-      <main className="container grid">
+      <main className="container">
 
       {/* Estatísticas detalhadas do primeiro projeto */}
       {stats && (
