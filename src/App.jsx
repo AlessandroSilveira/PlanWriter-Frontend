@@ -1,57 +1,63 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import Login from "./pages/Login.jsx";
-import Register from "./pages/Register.jsx";
+// src/App.jsx
+import { useState } from "react";
+import { Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+
+import Navbar from "./components/Navbar.jsx";
+import LoginPopover from "./components/LoginPopover.jsx";
+import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+
+import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import NewProject from "./pages/NewProject.jsx";
 import ProjectDetails from "./pages/ProjectDetails.jsx";
-import PrivateRoute from "./components/PrivateRoute.jsx";
-import Navbar from "./components/Navbar.jsx";
 
 export default function App() {
-  const location = useLocation();
-  const hideNav = location.pathname === "/login" || location.pathname === "/register";
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
 
   return (
-    <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] font-serif">
-      {!hideNav && <Navbar />}
+    <AuthProvider>
+      <Navbar
+        onLoginClick={(el) => {
+          setAnchorEl(el);
+          setLoginOpen(true);
+        }}
+      />
 
-      {/* Container central da aplicação */}
-      <div className="app-container max-w-[1600px] mx-auto px-4">
-        <Routes>
-          {/* públicas */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/new"
+          element={
+            <ProtectedRoute>
+              <NewProject />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:id"
+          element={
+            <ProtectedRoute>
+              <ProjectDetails />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
 
-          {/* privadas */}
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/projects/new"
-            element={
-              <PrivateRoute>
-                <NewProject />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/projects/:id"
-            element={
-              <PrivateRoute>
-                <ProjectDetails />
-              </PrivateRoute>
-            }
-          />
-
-          {/* fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </div>
-    </div>
+      <LoginPopover
+        open={loginOpen}
+        anchorEl={anchorEl}
+        onClose={() => setLoginOpen(false)}
+      />
+    </AuthProvider>
   );
 }

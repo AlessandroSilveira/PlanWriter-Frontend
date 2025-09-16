@@ -1,107 +1,129 @@
+// src/pages/NewProject.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createProject } from "../api/projects";
 
 export default function NewProject() {
   const navigate = useNavigate();
+
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [wordCountGoal, setWordCountGoal] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [genre, setGenre] = useState("");
+  const [deadline, setDeadline] = useState(""); // YYYY-MM-DD
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
-    if (!title?.trim()) {
-      setErr("Informe um título para o projeto.");
-      return;
-    }
-    setLoading(true);
+    setSaving(true);
     try {
       const payload = {
-        title: title.trim(),
-        description: description?.trim() || "",
-        wordCountGoal: wordCountGoal ? Number(wordCountGoal) : null,
-        deadline: deadline || null,
+        title,
+        description,
+        wordCountGoal,
+        deadline,
+        genre,
       };
       const created = await createProject(payload);
       const pid = created?.id ?? created?.projectId;
       if (pid) navigate(`/projects/${pid}`);
       else navigate("/");
-    } catch (e2) {
-      const apiMsg =
-        e2?.response?.data?.message ||
-        e2?.response?.data?.error ||
-        (typeof e2?.response?.data === "string" ? e2.response.data : null);
-      setErr(apiMsg || "Falha ao criar projeto.");
+    } catch (ex) {
+      const msg =
+        ex?.response?.data?.message ||
+        ex?.response?.data ||
+        "Falha ao criar o projeto.";
+      setErr(typeof msg === "string" ? msg : "Falha ao criar o projeto.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   return (
-    <section className="panel section-panel">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="h1 m-0">Novo Projeto</h1>
-          <p className="subhead">Defina um objetivo claro e uma data limite opcional.</p>
-        </div>
+    <div className="py-6 space-y-6">
+      {/* BOX 1600px */}
+      <div className="container container--wide">
+        <section className="panel section-panel">
+          <div className="flex items-center justify-between">
+            <h2 className="section-title">Novo projeto</h2>
+            <Link to="/" className="btn-primary">Voltar</Link>
+          </div>
+
+          <form onSubmit={onSubmit} className="form-stack mt-4">
+            {/* Linha 1: Título e Meta de palavras */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Título</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Meta de palavras</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input w-full"
+                  value={wordCountGoal}
+                  onChange={(e) => setWordCountGoal(e.target.value)}
+                  placeholder="ex.: 50000"
+                />
+              </div>
+            </div>
+
+            {/* Linha 2: Gênero e Prazo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Gênero</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  placeholder="ex.: Romance"
+                />
+              </div>
+              <div>
+                <label className="label">Prazo</label>
+                <input
+                  type="date"
+                  className="input w-full"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Linha 3: Descrição */}
+            <div>
+              <label className="label">Descrição</label>
+              <textarea
+                rows={4}
+                className="input w-full"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Fale um pouco sobre o projeto…"
+              />
+            </div>
+
+            {/* Linha 4: Botões */}
+            <div className="flex gap-3">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Salvando..." : "Salvar projeto"}
+              </button>
+              <Link to="/" className="button">Cancelar</Link>
+            </div>
+
+            {err && <div className="text-red-600 mt-3">{err}</div>}
+          </form>
+        </section>
       </div>
-
-      <form className="grid md:grid-cols-2 gap-3 mt-4" onSubmit={onSubmit}>
-        <div className="md:col-span-2">
-          <label className="kicker">Título</label>
-          <input
-            type="text"
-            placeholder="Ex.: Romance: A Chuva e o Silêncio"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="kicker">Descrição (opcional)</label>
-          <textarea
-            placeholder="Sobre o que é o projeto? Notas rápidas, contexto, etc."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="kicker">Meta de palavras (opcional)</label>
-          <input
-            type="number"
-            min="1"
-            placeholder="Ex.: 50000"
-            value={wordCountGoal}
-            onChange={(e) => setWordCountGoal(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="kicker">Data limite (opcional)</label>
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
-        </div>
-
-        {err && <p className="text-red-600 text-sm md:col-span-2">{err}</p>}
-
-        <div className="md:col-span-2 flex items-center gap-2 pt-1">
-          <button type="submit" className="button" disabled={loading}>
-            {loading ? "Criando..." : "Criar projeto"}
-          </button>
-          <button type="button" className="button secondary" onClick={() => navigate(-1)}>
-            Cancelar
-          </button>
-        </div>
-      </form>
-    </section>
+    </div>
   );
 }

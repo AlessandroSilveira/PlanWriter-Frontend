@@ -1,43 +1,65 @@
-// src/context/AuthContext.jsx
-import { createContext, useState, useEffect } from "react";
-import api from "../api/http"; // opcional, mas útil se quiser interceptors globais também
+import { createContext, useContext, useEffect, useState } from "react";
 
-export const AuthContext = createContext();
-
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
-
-  useEffect(() => {
-    // nada aqui: quem injeta o token é o interceptor do http.js via localStorage
-  }, [token]);
-
-  // 🔧 aceita vários nomes comuns para o token
-  const login = (payload) => {
-    const t =
-      payload?.accessToken ||
-      payload?.token ||
-      payload?.jwt ||
-      payload?.id_token ||
-      null;
-
-    if (!t) {
-      throw new Error("Token não encontrado na resposta de login.");
+// Lê token salvo e ignora "null"/"undefined" e JWT expirado
+function getStoredToken() {
+  try {
+    const raw = localStorage.getItem("token");
+    if (!raw || raw === "null" || raw === "undefined") return null;
+    if (raw.startsWith("{") || raw.startsWith("[")) {
+      const obj = JSON.parse(raw);
+      if (typeof obj === "string") return obj;
+      if (obj?.token) return obj.token;
+      return null;
     }
-    localStorage.setItem("token", t);
-    setToken(t);
-    setUser(payload?.user ?? null);
+    const parts = raw.split(".");
+    if (parts.length === 3) {
+      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const payload = JSON.parse(atob(b64));
+      if (payload?.exp && Date.now() / 1000 >= payload.exp) return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+// 👉 exportamos também o contexto por compatibilidade
+export const AuthContext = createContext({
+  token: null,
+  isAuthenticated: false,
+  setToken: () => {},
+  logout: () => {},
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+export function AuthProvider({ children }) {
+  const [token, setTokenState] = useState(getStoredToken());
+
+  const setToken = (t) => {
+    if (t && t !== "null" && t !== "undefined") {
+      localStorage.setItem("token", t);
+      setTokenState(t);
+    } else {
+      localStorage.removeItem("token");
+      setTokenState(null);
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
+    try { localStorage.removeItem("token"); } catch {}
+    setTokenState(null);
   };
 
+  useEffect(() => {
+    const cur = getStoredToken();
+    if (cur !== token) setToken(cur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ token, isAuthenticated: !!token, setToken, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}

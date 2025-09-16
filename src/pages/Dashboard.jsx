@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getProjects, getProjectStats } from '../api/projects.js';
@@ -12,35 +11,41 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    getProjects()
-      .then(async data => {
-        if (Array.isArray(data)) {
-          setProjects(data);
-          if (data.length > 0) {
-            try {
-              const s = await getProjectStats(data[0].id ?? data[0].projectId);
-              setStats(s);
-            } catch (err) {
-              console.warn("Erro ao carregar estatísticas:", err);
-            }
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getProjects();
+      if (Array.isArray(data)) {
+        setProjects(data);
+        if (data.length > 0) {
+          try {
+            const s = await getProjectStats(data[0].id ?? data[0].projectId);
+            setStats(s);
+          } catch (err) {
+            console.warn("Erro ao carregar estatísticas:", err);
           }
-        } else {
-          console.error("Resposta inesperada da API:", data);
-          setProjects([]);
         }
-      })
-      .catch(() => setError('Erro ao carregar projetos'))
-      .finally(() => setLoading(false));
+      } else {
+        setProjects([]);
+      }
+    } catch (e) {
+      const is401 = e?.response?.status === 401;
+      setError(is401 ? 'Sessão expirada. Faça login novamente.' : 'Erro ao carregar projetos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
   if (loading) return <p>Carregando...</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
-
 
   // Anel de progresso visual
   const Ring = ({ pct = 0 }) => {
-    const clamped = Math.max(0, Math.min(100, pct));
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
     return (
       <div className="ring2">
         {clamped}%<small> concluído</small>
@@ -59,19 +64,21 @@ export default function Dashboard() {
       {/* HEADER */}
       <header className="hero">
         <div className="container hero-inner">
-          <div>
-            <h1>Bem-vindo de volta, escritor.</h1>
-            <p>
-              Você escreveu <strong>1.420</strong> palavras ontem. Continue no ritmo — sua melhor
-              sequência é de <strong>5 dias</strong>.
-            </p>
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold">Bem vindo de volta, Escritor.</h1>
+            <Link to="/projects/new" className="btn-primary">+ Novo projeto</Link>
           </div>
-
-          {stats && (
+          {error && (
+            <div className="mt-2">
+              <p className="text-red-600">{error}</p>
+              {error.includes('Sessão expirada') && <Link to="/login" className="button mt-2">Ir para login</Link>}
+            </div>
+          )}
+          {!error && stats && (
             <div className="summary">
               <div className="kpi">
                 <div className="label">Total</div>
-                <div className="value">{(stats.totalWords ?? 0).toLocaleString("pt-BR")}</div>
+                <div className="value">{(stats.totalWords ?? 0).toLocaleString('pt-BR')}</div>
                 <div className="hint">palavras</div>
               </div>
               <div className="kpi">
@@ -81,9 +88,9 @@ export default function Dashboard() {
               </div>
               <div className="kpi">
                 <div className="label">Melhor dia</div>
-                <div className="value">{stats.bestDay?.words?.toLocaleString("pt-BR") ?? 0}</div>
+                <div className="value">{stats.bestDay?.words?.toLocaleString('pt-BR') ?? 0}</div>
                 <div className="hint">
-                  {stats.bestDay?.date ? new Date(stats.bestDay.date).toLocaleDateString("pt-BR") : "—"}
+                  {stats.bestDay?.date ? new Date(stats.bestDay.date).toLocaleDateString('pt-BR') : '—'}
                 </div>
               </div>
               <div className="kpi">
@@ -93,16 +100,12 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
-        
         </div>
       </header>
 
       {/* MAIN */}
       <main className="flex-grow dashboard-gap">
-        {/* Grade principal: projetos + meta do mês */}
         <div className="container grid">
-          {/* Lista de projetos */}
           <section className="panel">
             <h2>Seus projetos</h2>
 
@@ -123,12 +126,12 @@ export default function Dashboard() {
                   return (
                     <Link key={pid} to={`/projects/${pid}`} className="no-underline">
                       <div className="proj">
-                        <div className="kicker">{p?.genre ?? "Projeto"}</div>
+                        <div className="kicker">{p?.genre ?? 'Projeto'}</div>
                         <div className="title">{p.title ?? p.name}</div>
                         {p.description && <p className="meta">{p.description}</p>}
                         <p className="meta">
-                          {(p.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
-                          {p.wordCountGoal?.toLocaleString("pt-BR")} palavras
+                          {(p.currentWordCount ?? 0).toLocaleString('pt-BR')} /{" "}
+                          {p.wordCountGoal?.toLocaleString('pt-BR')} palavras
                         </p>
                         {p.wordCountGoal ? (
                           <div className="progress">
@@ -143,7 +146,6 @@ export default function Dashboard() {
             )}
           </section>
 
-          {/* Meta do mês / anel de progresso para o primeiro projeto */}
           <aside className="panel">
             <h2>Meta do mês</h2>
             <p className="sub">Progresso no projeto selecionado</p>
@@ -154,14 +156,14 @@ export default function Dashboard() {
                   <div className="kpi">
                     <div className="label">Atual</div>
                     <div className="value">
-                      {(first.currentWordCount ?? 0).toLocaleString("pt-BR")}
+                      {(first.currentWordCount ?? 0).toLocaleString('pt-BR')}
                     </div>
                     <div className="hint">palavras</div>
                   </div>
                   <div className="kpi kpi--lg">
                     <div className="label">Meta</div>
                     <div className="value">
-                      {(first.wordCountGoal ?? 0).toLocaleString("pt-BR")}
+                      {(first.wordCountGoal ?? 0).toLocaleString('pt-BR')}
                     </div>
                     <div className="hint">palavras</div>
                   </div>
@@ -173,26 +175,6 @@ export default function Dashboard() {
           </aside>
         </div>
 
-        {/* Estatísticas detalhadas + Conquistas */}
-        <div className="container grid">
-          {stats && (
-            <section className="panel2">
-              <h2 className="section-title">Estatísticas detalhadas</h2>
-              <div className="mt-3">
-                <WritingStats stats={stats} />
-              </div>
-            </section>
-          )}
-
-          <aside className="panel2">
-            <h2>Conquistas Recentes</h2>
-            <div className="badges">
-              <RecentBadges />
-            </div>
-          </aside>
-        </div>
-
-        {/* Comparativo entre projetos */}
         {projects.length > 1 && (
           <div className="container">
             <section className="panel2">
@@ -205,7 +187,6 @@ export default function Dashboard() {
         )}
       </main>
 
-      {/* FOOTER */}
       <footer className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
         © 2025 PlanWriter — escreva com conforto
       </footer>

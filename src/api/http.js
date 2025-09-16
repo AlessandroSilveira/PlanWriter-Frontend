@@ -1,14 +1,19 @@
-// src/api/http.js
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "https://localhost:56133/api",
+  baseURL: "/api",
 });
 
-// injeta o token em toda requisição
+// injeta Authorization: Bearer <token> se existir no localStorage
 api.interceptors.request.use((config) => {
-  const t = localStorage.getItem("token");
-  if (t) config.headers.Authorization = `Bearer ${t}`;
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers = config.headers || {};
+    // não sobrescreve Authorization se já existir
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
   return config;
 });
 

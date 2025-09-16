@@ -38,6 +38,7 @@ html.theme-dark {
 
 button {
   @apply px-3 py-2 rounded-md border;
+  font: 700 14px var(--font-sans);
 }
 
 input, select, textarea {
