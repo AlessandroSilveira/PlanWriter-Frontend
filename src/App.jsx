@@ -52,7 +52,71 @@ export default function App() {
           }
         />
       </Routes>
+      <Route
+        path="/sprint"
+        element={
+          <ProtectedRoute>
+            <WordSprint />
+          </ProtectedRoute>
+       }
+      />
+        <Route path="/recursos" element={
+     <ProtectedRoute>
+       <Resources />
+     </ProtectedRoute>
+   } />
 
+   <Route
+     path="/me"
+     element={
+       <ProtectedRoute>
+         <ProfileMe />
+       </ProtectedRoute>
+     }
+   />
+<Route
+    path="/progress/new"
+     element={
+       <ProtectedRoute>
+         <QuickLog />
+       </ProtectedRoute>
+     }
+   />
+
+    <Route
+     path="/write"
+     element={
+       <ProtectedRoute>
+         <FocusEditor />
+       </ProtectedRoute>
+     }
+   />
+   <Route
+     path="/validate"
+     element={
+       <ProtectedRoute>
+         <Validate />
+       </ProtectedRoute>
+     }
+   />
+   <Route
+     path="/certificate"
+     element={
+       <ProtectedRoute>
+         <Certificate />
+       </ProtectedRoute>
+     }
+   />
+  
+   <Route
+     path="/events"
+     element={
+       <ProtectedRoute>
+         <Events />
+       </ProtectedRoute>
+     }
+   />
+   
       <LoginPopover
         open={loginOpen}
         anchorEl={anchorEl}

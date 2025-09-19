@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar({ onLoginClick }) {
@@ -8,34 +8,37 @@ export default function Navbar({ onLoginClick }) {
 
   const handleLogout = () => {
     try {
-      logout(); // limpa token do contexto/localStorage
+      logout?.(); // AuthContext
     } finally {
-      // limpa chaves antigas, por garantia
+      // limpeza defensiva
       localStorage.removeItem("access_token");
       localStorage.removeItem("jwt");
       localStorage.removeItem("authToken");
-      // agora temos landing como home
       navigate("/", { replace: true });
     }
   };
 
+  // switch antigo Claro ⇄ Escuro
   const toggleTheme = () => {
     const html = document.documentElement;
-    const isDark = html.getAttribute("data-theme") === "dark";
-    const next = isDark ? "sepia" : "dark";
+    const cur = html.getAttribute("data-theme") || "light";
+    const next = cur === "dark" ? "light" : "dark";
     html.setAttribute("data-theme", next);
     localStorage.setItem("pw_theme", next);
   };
 
-  // garante tema salvo (apenas client)
   useEffect(() => {
     const saved = localStorage.getItem("pw_theme");
     if (saved) document.documentElement.setAttribute("data-theme", saved);
   }, []);
 
+  const goQuickLog = () => navigate("/progress/new");
+  const linkClass = ({ isActive }) => `btn ghost ${isActive ? "active" : ""}`.trim();
+
   return (
     <nav className="navbar">
       <div className="container nav-row">
+        {/* Brand */}
         <Link to="/" className="brand no-underline">
           <div className="logo">PW</div>
           <div className="title">
@@ -44,23 +47,57 @@ export default function Navbar({ onLoginClick }) {
           </div>
         </Link>
 
-        <div></div>
+        {/* Centro: navegação principal (quando logado) */}
+        <div className="nav-center hidden md:flex items-center gap-2">
+          {isAuthenticated && (
+            <>
+              <NavLink to="/projects" className={linkClass}>Seus Projetos</NavLink>
+              <NavLink to="/write" className={linkClass}>Escrever</NavLink>
+              <NavLink to="/sprint" className={linkClass}>Sprint</NavLink>
+              <NavLink to="/me" className={linkClass}>Meu Perfil</NavLink>
+              {/* Se quiser habilitar Recursos, tire o comentário abaixo */}
+              {/* <NavLink to="/recursos" className={linkClass}>Recursos</NavLink> */}
+              <NavLink to="/events" className={linkClass}>Eventos</NavLink>
+              <button className="btn-primary" onClick={goQuickLog} type="button">
+                + Registrar
+              </button>
+            </>
+          )}
+        </div>
 
+        {/* Ações à direita */}
         <div className="nav-actions">
+          {/* Switch antigo: Claro ⇄ Escuro */}
           <div className="theme-toggle" id="themeToggle">
             <span>Claro</span>
-            <div className="switch" onClick={toggleTheme}>
+            <div
+              className="switch"
+              onClick={toggleTheme}
+              role="switch"
+              tabIndex={0}
+              aria-checked={document.documentElement.getAttribute("data-theme") === "dark"}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleTheme();
+                }
+              }}
+              aria-label="Alternar tema claro/escuro"
+            >
               <div className="knob"></div>
             </div>
             <span>Escuro</span>
           </div>
 
           {isAuthenticated ? (
-            <button className="btn" onClick={handleLogout}>Sair</button>
+            <button className="btn" onClick={handleLogout} type="button">
+              Sair
+            </button>
           ) : (
             <button
               className="btn"
               onClick={(e) => onLoginClick?.(e.currentTarget)} // abre popover ancorado
+              type="button"
             >
               Entrar
             </button>

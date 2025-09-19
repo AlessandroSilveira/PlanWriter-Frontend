@@ -1,6 +1,7 @@
 // src/pages/ProjectDetails.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+
 import {
   getProject,
   getProjectHistory,
@@ -34,7 +35,6 @@ function ProgressChart({ daily, goal = 50000, days = 30, minHeight = 360 }) {
   const wrapRef = useRef(null);
   const [size, setSize] = useState({ width: 900, height: minHeight });
 
-  // Observa largura e altura do container para ocupar TODO o espaço
   useEffect(() => {
     if (!wrapRef.current) return;
     const ro = new ResizeObserver(() => {
@@ -49,7 +49,6 @@ function ProgressChart({ daily, goal = 50000, days = 30, minHeight = 360 }) {
 
   const { width, height } = size;
 
-  // paddings (mais espaço embaixo para labels giradas)
   const padLeft = 46;
   const padRight = 24;
   const padTop = 24;
@@ -202,12 +201,22 @@ function StatItem({ label, value, bar }) {
 /* ===================== Página ===================== */
 export default function ProjectDetails() {
   const { id } = useParams();
+  const navigate = useNavigate(); // <-- hook dentro do componente
+
   const [project, setProject] = useState(null);
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);
   const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openModal, setOpenModal] = useState(false);
+
+  const handleBack = () => {
+    if (window.history && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/projects");
+    }
+  };
 
   const reload = async () => {
     setLoading(true);
@@ -286,45 +295,34 @@ export default function ProjectDetails() {
 
   if (loading) return <div className="p-4">Carregando…</div>;
 
-
-
-
   return (
-    
-      <div className="py-6 space-y-6">
+    <div className="py-6 space-y-6">
       {/* ===== 1) TOPO — card padronizado + ações ===== */}
       <div className="container container--wide">
         <section className="panel section-panel">
           <div className="flex items-start justify-between gap-4">
             {/* Card padronizado (kicker, title, meta, barra) */}
             <div className="proj w-full">
-               <div className="title">Título: {project?.title ?? "Projeto"}</div>
-              
-              <p className="meta">
-                Genêro: {(project?.genre || "Projeto")}
-              </p>
-             
+              <div className="title">Título: {project?.title ?? "Projeto"}</div>
+
+              <p className="meta">Genêro: {project?.genre || "Projeto"}</p>
+
               {project?.description && (
                 <p className="meta">Descrição: {project.description}</p>
               )}
 
               {project?.deadline && (
-                <p className="meta">Prazo: {new Date(project.deadline).toLocaleDateString("pt-BR")}</p>
-             
-          )}
+                <p className="meta">
+                  Prazo: {new Date(project.deadline).toLocaleDateString("pt-BR")}
+                </p>
+              )}
 
+              {goal ? <p className="meta">Meta: {fmt(goal)}</p> : null}
 
-               {goal ? (
-                <p className="meta">Meta: {fmt(goal)}</p>
-             
-           ) : null}
+              <p className="meta">Total atual: {fmt(totalWords)}</p>
 
-              
-                <p className="meta">Total atual: {fmt(totalWords)}</p>
-             
-        
-
-              <p className="meta">Progresso: {fmt(totalWords)} / {fmt(goal)} palavras
+              <p className="meta">
+                Progresso: {fmt(totalWords)} / {fmt(goal)} palavras
               </p>
 
               {goal ? (
@@ -344,20 +342,27 @@ export default function ProjectDetails() {
 
             {/* Ações */}
             <div className="flex-shrink-0 flex flex-col gap-2">
-              <Link to="/" className="btn-primary">
-                Voltar
-              </Link>
               <button
                 className="btn-primary"
                 onClick={() => setOpenModal(true)}
+                type="button"
               >
                 + Adicionar progresso
+              </button>
+
+              <button
+                className="btn-primary"
+                onClick={handleBack}
+                type="button"
+                aria-label="Voltar para a tela anterior"
+              >
+                Voltar
               </button>
             </div>
           </div>
 
-          {/* Pílulas de detalhes */}
-          {/* <div className="mt-3 flex flex-wrap gap-2 text-sm">
+          {/* Pílulas de detalhes
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
             {project?.deadline && (
               <span className="px-2 py-1 rounded bg-white/70 dark:bg-slate-900/60 border border-black/5 dark:border-white/10">
                 Prazo:{" "}
@@ -451,35 +456,45 @@ export default function ProjectDetails() {
             </div>
           </section>
 
-         {/* Conquistas — agora com a mesma largura do box do título */}
-{/* Conquistas — largura total, itens lado a lado */}
-<section className="panel section-panel col-span-1 lg:col-span-4">
-  <h2 className="section-title">Conquistas</h2>
-  {badges?.length ? (
-    <div className="badges-row">{badges.map((b, i) => {
-      const img   = getBadgeImage(b);
-      const glyph = getBadgeGlyph(b);
-      const title = badgeTitle(b);
-      const description = badgeDerscription(b);
-      return (
-        <div key={b.id || b.Id || title || i} className="badge-item">
-          {img ? (
-            <img src={img} alt={title} className="badge-icon-img" loading="lazy" />
-          ) : glyph ? (
-            <div className="badge-icon">{glyph}</div>
-          ) : (
-            <div className="badge-icon">🏅</div>
-          )}
-          <div className="badge-caption"><b>{title}</b></div>
-          <div className="badge-caption"><b>{description}</b></div>
-        </div>
-      );
-    })}</div>
-  ) : (
-    <div className="text-muted">Nenhuma conquista ainda.</div>
-  )}
-</section>
-
+          {/* Conquistas — agora com a mesma largura do box do título */}
+          {/* Conquistas — largura total, itens lado a lado */}
+          <section className="panel section-panel col-span-1 lg:col-span-4">
+            <h2 className="section-title">Conquistas</h2>
+            {badges?.length ? (
+              <div className="badges-row">
+                {badges.map((b, i) => {
+                  const img = getBadgeImage(b);
+                  const glyph = getBadgeGlyph(b);
+                  const title = badgeTitle(b);
+                  const description = badgeDerscription(b);
+                  return (
+                    <div key={b.id || b.Id || title || i} className="badge-item">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={title}
+                          className="badge-icon-img"
+                          loading="lazy"
+                        />
+                      ) : glyph ? (
+                        <div className="badge-icon">{glyph}</div>
+                      ) : (
+                        <div className="badge-icon">🏅</div>
+                      )}
+                      <div className="badge-caption">
+                        <b>{title}</b>
+                      </div>
+                      <div className="badge-caption">
+                        <b>{description}</b>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-muted">Nenhuma conquista ainda.</div>
+            )}
+          </section>
         </div>
       </div>
 
@@ -494,13 +509,11 @@ export default function ProjectDetails() {
   );
 }
 
-  /* helpers badges locais */
+/* helpers badges locais */
 function getBadgeImage(b) {
-  // tenta achar uma URL de imagem, se existir
   return b?.imageUrl || b?.iconUrl || b?.image || b?.url || null;
 }
 function getBadgeGlyph(b) {
-  // pega o emoji enviado pelo back (Icon/camelCase)
   return b?.icon || b?.Icon || null;
 }
 function badgeTitle(b) {

@@ -1,0 +1,33 @@
+{
+  "checklists": [
+    {
+      "id": "prep-plot",
+      "title": "Preparação de Enredo",
+      "items": [
+        "Ideia em 1 frase (premissa)",
+        "Protagonista: desejo e conflito",
+        "Antagonismo/forças de oposição",
+        "Mapa de 5 pontos (setup → gatilho → meio → crise → clímax)"
+      ]
+    },
+    {
+      "id": "prep-world",
+      "title": "Mundo e Pesquisa",
+      "items": [
+        "Cenários principais (3 a 5)",
+        "Elementos de época/tecnologia",
+        "Glossário de nomes (10–20 opções)"
+      ]
+    },
+    {
+      "id": "prep-process",
+      "title": "Processo e Rotina",
+      "items": [
+        "Local e horário de escrita",
+        "Alvo diário (ex.: 1.667 palavras)",
+        "Plano B (dias apertados = 300 palavras)",
+        "Regras de ouro (não editar no mesmo dia, etc.)"
+      ]
+    }
+  ]
+}
