@@ -6,6 +6,7 @@ import EventProgressCard from "../components/EventProgressCard.jsx";
 import ProjectComparisonChart from "../components/ProjectComparisonChart";
 import WritingHeatmap from "../components/WritingHeatmap.jsx";
 import TodayTargetCard from "../components/TodayTargetCard.jsx";
+import RecentBadges from "../components/RecentBadges.jsx";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -44,7 +45,7 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // ===== Heatmap (últimos ~53*7 dias) somando todos os projetos =====
+  // Heatmap (últimos ~53*7 dias) somando todos os projetos
   useEffect(() => {
     if (!projects?.length) {
       setHeat({ loading: false, days: [], total: 0, streak: 0, today: 0 });
@@ -114,7 +115,7 @@ export default function Dashboard() {
 
   if (loading) return <p>Carregando...</p>;
 
-  // ===== Donut SVG centralizado =====
+  // Donut SVG centralizado
   const Ring = ({
     pct = 0,
     size = 120,
@@ -126,6 +127,7 @@ export default function Dashboard() {
     const p = Math.min(100, Math.max(0, Number(pct) || 0));
     const r = (size - stroke) / 2;
     const C = 2 * Math.PI * r;
+    theoffset:; // (no-op to avoid accidental editor collapsing)
     const offset = C - (p / 100) * C;
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block">
@@ -165,6 +167,7 @@ export default function Dashboard() {
   const goalRaw = Number(first?.wordCountGoal ?? 0);
   const goalMath = Math.max(1, goalRaw);
   const progressPct = Math.min(100, Math.max(0, (cur / goalMath) * 100));
+  const firstId = first?.id ?? first?.projectId;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -326,6 +329,13 @@ export default function Dashboard() {
             )}
           </section>
         </div>
+
+        {/* Conquistas por projeto (usa seu endpoint já existente) */}
+        {firstId && (
+          <div className="container mt-4">
+            <RecentBadges projectId={firstId} take={6} />
+          </div>
+        )}
 
         {projects.length > 1 && (
           <div className="container">

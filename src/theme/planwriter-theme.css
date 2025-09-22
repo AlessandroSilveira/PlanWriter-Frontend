@@ -390,3 +390,7 @@
 
 }
 
+.segmented { display:inline-flex; background:var(--seg-bg, rgba(0,0,0,.06)); border-radius:999px; padding:4px; }
+.segmented-item { padding:6px 10px; border-radius:999px; font-size:.875rem; }
+.segmented-item.active { background:var(--accent, #0f3a5f); color:white; }
+

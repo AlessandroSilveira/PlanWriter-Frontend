@@ -44,3 +44,12 @@ export async function updateProjectEvent(eventId, projectId, payload) {
 export async function leaveEvent(eventId, projectId) {
   await axios.delete(`/api/events/${eventId}/projects/${projectId}`);
 }
+
+/** Retorna a leaderboard do evento (scope: total|daily|weekly|monthly, top: número de posições) */
+
+export async function getEventLeaderboard(eventId, { scope = "total", top = 50 } = {}) {
+  const { data } = await axios.get(`/api/events/${eventId}/leaderboard`, {
+    params: { scope, top },
+  });
+  return data; // [{ projectId, projectTitle, userName, words, percent, won, rank }, ...]
+}

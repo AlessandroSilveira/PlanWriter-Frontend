@@ -1,3 +1,4 @@
+// src/components/ProgressModal.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import * as ProjectsAPI from "../api/projects";
