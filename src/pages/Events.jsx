@@ -1,5 +1,5 @@
 // src/pages/Events.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -7,7 +7,6 @@ import {
   getActiveEvents,
   getEventById,
   getEventProgress,
-  // os três abaixo são opcionais; se não existirem, usamos fallback via axios
   joinEvent as apiJoinEvent,
   updateEventTarget as apiUpdateTarget,
   leaveEvent as apiLeaveEvent,
@@ -16,26 +15,31 @@ import {
 import { getProjects } from "../api/projects";
 import EventLeaderboard from "../components/EventLeaderboard.jsx";
 import ProgressModal from "../components/ProgressModal.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import Skeleton from "../components/Skeleton.jsx"; // default import
+import { downloadCSV } from "../utils/csv";
+import Alert from "../components/Alert.jsx";
 
 /* Utils */
 function useQuery() {
   const { search } = useLocation();
-  return useMemo(() => new URLSearchParams(search), [search]);
+  return new URLSearchParams(search);
 }
 const fmt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
+const fmtDateBR = (d) => {
+  try { return new Date(d).toLocaleDateString("pt-BR"); } catch { return String(d ?? ""); }
+};
 
 /* Página */
 export default function Events() {
   const q = useQuery();
   const navigate = useNavigate();
 
-  // URL params (se vierem)
   const qEventId = q.get("eventId") || "";
   const qProjectId = q.get("projectId") || "";
 
-  // state
-  const [events, setEvents] = useState([]); // eventos ativos (lista)
-  const [event, setEvent] = useState(null); // evento selecionado
+  const [events, setEvents] = useState([]);
+  const [event, setEvent] = useState(null);
   const [eventId, setEventId] = useState(qEventId);
 
   const [projects, setProjects] = useState([]);
@@ -51,37 +55,35 @@ export default function Events() {
 
   const [openAddProgress, setOpenAddProgress] = useState(false);
 
-  /* Carrega lista de eventos ativos e define selecionado */
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    setMsg("");
+    try {
+      const list = await getActiveEvents();
+      const arr = Array.isArray(list) ? list : [];
+      setEvents(arr);
+      let id = qEventId;
+      if (!id && arr.length) id = arr[0].id ?? arr[0].Id ?? "";
+      setEventId(id || "");
+    } catch (e) {
+      setErr(e?.response?.data?.message || e?.message || "Falha ao carregar eventos ativos.");
+    } finally {
+      setLoading(false);
+    }
+  }, [qEventId]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
-      setLoading(true);
-      setErr("");
-      setMsg("");
-      try {
-        const list = await getActiveEvents();
-        const arr = Array.isArray(list) ? list : [];
-        if (!alive) return;
-        setEvents(arr);
-
-        // se já veio um id pela URL, usamos ele; senão, o primeiro ativo
-        let id = qEventId;
-        if (!id && arr.length) id = arr[0].id ?? arr[0].Id ?? "";
-
-        setEventId(id || "");
-      } catch (e) {
-        if (!alive) return;
-        setErr(e?.response?.data?.message || e?.message || "Falha ao carregar eventos ativos.");
-      } finally {
-        if (alive) setLoading(false);
-      }
+      await fetchEvents();
+      if (!alive) return;
     })();
     return () => {
       alive = false;
     };
-  }, [qEventId]);
+  }, [fetchEvents]);
 
-  /* Carrega evento selecionado (fonte da verdade) */
   useEffect(() => {
     let alive = true;
     if (!eventId) {
@@ -104,7 +106,6 @@ export default function Events() {
     };
   }, [eventId]);
 
-  /* Carrega projetos do usuário */
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -113,8 +114,6 @@ export default function Events() {
         const arr = Array.isArray(list) ? list : [];
         if (!alive) return;
         setProjects(arr);
-
-        // define projeto selecionado (URL > primeiro da lista)
         if (!qProjectId && arr[0]) {
           setProjectId(arr[0].id ?? arr[0].projectId ?? "");
         }
@@ -128,7 +127,6 @@ export default function Events() {
     };
   }, [qProjectId]);
 
-  /* Carrega progresso do projeto no evento */
   const loadProgress = async (eid, pid) => {
     if (!eid || !pid) {
       setProgress(null);
@@ -137,7 +135,6 @@ export default function Events() {
     try {
       const p = await getEventProgress({ eventId: eid, projectId: pid });
       setProgress(p || null);
-      // target inicial: do progresso -> senão do evento -> senão 50k
       const tgt =
         Number(p?.targetWords ?? p?.TargetWords) ||
         Number(event?.defaultTargetWords ?? event?.DefaultTargetWords) ||
@@ -156,7 +153,6 @@ export default function Events() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, projectId]);
 
-  /* Derivados de UI */
   const evName = event?.name ?? event?.Name ?? "Evento";
   const evStart = event?.startsAtUtc ?? event?.startsAt ?? event?.StartsAtUtc;
   const evEnd = event?.endsAtUtc ?? event?.endsAt ?? event?.EndsAtUtc;
@@ -169,7 +165,6 @@ export default function Events() {
   const targetWords = Number(progress?.targetWords ?? progress?.TargetWords ?? target) || 0;
   const percent = Math.min(100, Math.max(0, targetWords ? (total / targetWords) * 100 : 0));
   const dailyTarget = useMemo(() => {
-    // estimativa simples: meta/30
     const t = targetWords || evDefaultTarget || 0;
     return t ? Math.ceil(t / 30) : 0;
   }, [targetWords, evDefaultTarget]);
@@ -179,7 +174,6 @@ export default function Events() {
     [projects, projectId]
   );
 
-  /* Actions (com fallback) */
   const joinEvent = async () => {
     if (!eventId || !projectId || !Number(target)) return;
     setBusy(true);
@@ -236,7 +230,6 @@ export default function Events() {
       if (typeof apiLeaveEvent === "function") {
         await apiLeaveEvent(eventId, { projectId });
       } else {
-        // tentativas comuns
         try {
           await axios.delete(`/api/events/${eventId}/participants/${projectId}`);
         } catch {
@@ -252,20 +245,176 @@ export default function Events() {
     }
   };
 
-  /* Render */
-  if (loading) return <div className="container py-6">Carregando…</div>;
+  const exportProgressCsv = useCallback(async () => {
+    if (!eventId || !projectId) return;
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      let history = null;
+      const tryGet = async (url, params) => {
+        try {
+          const res = await axios.get(url, { params });
+          if (res?.data) return res.data;
+        } catch {}
+        return null;
+      };
+
+      history = await tryGet(`/api/events/${eventId}/progress/history`, { projectId });
+      if (!history) history = await tryGet(`/api/projects/${projectId}/events/${eventId}/progress`, {});
+      if (!history) history = await tryGet(`/api/projects/${projectId}/progress`, { eventId });
+      if (!history) history = await tryGet(`/api/events/${eventId}/progress`, { projectId });
+
+      const arr = Array.isArray(history) ? history : (history?.items || history?.data || []);
+      if (!Array.isArray(arr) || arr.length === 0) {
+        setMsg("Nenhum lançamento de progresso encontrado para exportar.");
+        setBusy(false);
+        return;
+      }
+
+      const rows = arr.map((it, idx) => {
+        const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.createdAt ?? it.CreatedAt ?? null;
+        const delta =
+          Number(it.wordsAdded ?? it.deltaWords ?? it.WordsAdded ?? it.words ?? it.Words ?? 0) || 0;
+        const totalAcc =
+          Number(it.total ?? it.totalWords ?? it.Total ?? it.TotalWords ?? 0) || undefined;
+        const source = it.source ?? it.Source ?? "";
+        const notes = it.notes ?? it.Notes ?? "";
+        return [fmtDateBR(date) || `#${idx + 1}`, delta, totalAcc ?? "", source, notes];
+      });
+
+      const headers = ["Data", "Palavras adicionadas", "Total acumulado", "Fonte", "Notas"];
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `progress_event-${eventId}_project-${projectId}_${dateStr}.csv`;
+      downloadCSV(filename, headers, rows);
+      setMsg("Exportado com sucesso.");
+    } catch (e) {
+      setErr(e?.response?.data?.message || e?.message || "Falha ao exportar progresso.");
+    } finally {
+      setBusy(false);
+    }
+  }, [eventId, projectId]);
+
+  if (loading) {
+    return (
+      <div className="container py-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-9 w-24" />
+        </div>
+
+        <section className="panel">
+          <div className="grid md:grid-cols-3 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="label">Evento</span>
+              <Skeleton className="h-10 w-full" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="label">Projeto</span>
+              <Skeleton className="h-10 w-full" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="label">Meta de palavras</span>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-3 w-40 mt-1" />
+            </label>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="grid md:grid-cols-4 gap-3">
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+          </div>
+          <div className="mt-3">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-48 mt-2" />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Skeleton className="h-9 w-36" />
+            <Skeleton className="h-9 w-40" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+        </section>
+
+        <section className="panel">
+          <Skeleton className="h-6 w-64" />
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-3/4" />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (!err && projects.length === 0) {
+    return (
+      <div className="container py-6">
+        <EmptyState
+          icon="alert"
+          title="Você ainda não tem projetos"
+          subtitle="Crie um projeto para poder participar dos eventos e registrar seu progresso."
+          actions={[{ label: "Criar projeto", to: "/projects/new" }]}
+        />
+      </div>
+    );
+  }
+
+  if (!err && events.length === 0) {
+    return (
+      <div className="container py-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Eventos</h1>
+          <button className="button" onClick={() => navigate(-1)}>
+            Voltar
+          </button>
+        </div>
+
+        <EmptyState
+          icon="calendar"
+          title="Nenhum evento ativo no momento"
+          subtitle="Fique de olho: novas campanhas sazonais aparecem aqui. Você pode continuar escrevendo nos seus projetos normalmente."
+          actions={[{ label: "Atualizar", onClick: fetchEvents }]}
+        />
+      </div>
+    );
+  }
+
+  if (err && events.length === 0) {
+    return (
+      <div className="container py-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Eventos</h1>
+          <button className="button" onClick={() => navigate(-1)}>
+            Voltar
+          </button>
+        </div>
+
+        <EmptyState
+          icon="alert"
+          title="Não foi possível carregar os eventos"
+          subtitle={String(err)}
+          actions={[{ label: "Tentar novamente", onClick: fetchEvents }]}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Eventos</h1>
-        <button className="button" onClick={() => navigate(-1)}>Voltar</button>
+        <button className="button" onClick={() => navigate(-1)}>
+          Voltar
+        </button>
       </div>
 
-      {/* Seletor de evento + projeto */}
       <section className="panel">
         <div className="grid md:grid-cols-3 gap-3">
-          {/* Evento */}
           <label className="flex flex-col gap-1">
             <span className="label">Evento</span>
             <select
@@ -287,7 +436,6 @@ export default function Events() {
             </select>
           </label>
 
-          {/* Projeto */}
           <label className="flex flex-col gap-1">
             <span className="label">Projeto</span>
             <select
@@ -304,7 +452,6 @@ export default function Events() {
             </select>
           </label>
 
-          {/* Meta do projeto no evento */}
           <label className="flex flex-col gap-1">
             <span className="label">Meta de palavras</span>
             <input
@@ -323,20 +470,17 @@ export default function Events() {
           </label>
         </div>
 
-        {err && <p className="text-red-600 mt-2">{err}</p>}
-        {msg && <p className="text-green-700 dark:text-green-400 mt-2">{msg}</p>}
+        {err && <Alert type="error">{err}</Alert>}
+        {msg && <Alert type="success">{msg}</Alert>}
       </section>
 
-      {/* Status do projeto no evento */}
       <section className="panel">
         <div className="grid md:grid-cols-4 gap-3">
           <div className="kpi">
             <div className="label">Evento</div>
             <div className="value">{evName}</div>
             <div className="hint">
-              {(evStart ? new Date(evStart).toLocaleDateString("pt-BR") : "?") +
-                " – " +
-                (evEnd ? new Date(evEnd).toLocaleDateString("pt-BR") : "?")}
+              {(evStart ? fmtDateBR(evStart) : "?") + " – " + (evEnd ? fmtDateBR(evEnd) : "?")}
             </div>
           </div>
           <div className="kpi">
@@ -358,7 +502,6 @@ export default function Events() {
           </div>
         </div>
 
-        {/* Barra de progresso */}
         <div className="mt-3">
           <div className="progress">
             <div className="fill" style={{ width: `${Math.round(percent)}%` }} />
@@ -368,10 +511,13 @@ export default function Events() {
           </div>
         </div>
 
-        {/* Ações */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {!joined ? (
-            <button className="btn-primary" onClick={joinEvent} disabled={busy || !projectId || !eventId || !target}>
+            <button
+              className="btn-primary"
+              onClick={joinEvent}
+              disabled={busy || !projectId || !eventId || !target}
+            >
               Inscrever projeto
             </button>
           ) : (
@@ -385,6 +531,14 @@ export default function Events() {
               <button className="button" onClick={leaveEvent} disabled={busy}>
                 Sair do evento
               </button>
+              <button
+                className="button"
+                onClick={exportProgressCsv}
+                disabled={busy || !projectId || !eventId}
+              >
+                Exportar progresso (CSV)
+              </button>
+
               {percent >= 100 && !won && (
                 <button
                   className="btn-primary"
@@ -409,14 +563,12 @@ export default function Events() {
         </div>
       </section>
 
-      {/* Leaderboard do evento */}
       {eventId && (
         <div className="mt-4">
           <EventLeaderboard eventId={eventId} top={20} />
         </div>
       )}
 
-      {/* Modal para lançar progresso rápido */}
       <ProgressModal
         open={openAddProgress}
         onClose={() => setOpenAddProgress(false)}

@@ -5,7 +5,7 @@ import HistoryFilters from "../components/HistoryFilters.jsx";
 import HistoryTable from "../components/HistoryTable.jsx";
 import Pagination from "../components/Pagination.jsx";
 import EmptyState from "../components/EmptyState.jsx";
-import { Skeleton } from "../components/Skeleton.jsx";
+import Skeleton from "../components/Skeleton.jsx"; // default import
 import { downloadCSV } from "../utils/csv";
 import { getProjects } from "../api/projects";
 import { getActiveEvents } from "../api/events";
@@ -38,7 +38,7 @@ export default function WritingDiary() {
   // loading / error / rows
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [msg, setMsg] = useState(""); // sucesso/infos
+  const [msg, setMsg] = useState("");
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
 
@@ -51,7 +51,7 @@ export default function WritingDiary() {
         if (!alive) return;
         setProjects(Array.isArray(p.value) ? p.value : []);
         setEvents(Array.isArray(e.value) ? e.value : []);
-      } catch { /* suave */ }
+      } catch { /* ignore */ }
     })();
     return () => { alive = false; };
   }, []);
@@ -77,22 +77,17 @@ export default function WritingDiary() {
         try {
           const res = await axios.get(url, { params });
           if (res?.data) return res.data;
-        } catch { /* tenta próximo */ }
+        } catch {}
         return null;
       };
 
-      // prioridades de endpoint:
-      // A) /api/writing/history
-      // B) /api/progress/history
-      // C) /api/projects/{projectId}/progress/history (se houver filtro de projeto)
-      // D) /api/me/progress/history
+      // prioridades
       let data =
         await tryGet("/api/writing/history") ||
         await tryGet("/api/progress/history") ||
         (filters.projectId ? await tryGet(`/api/projects/${filters.projectId}/progress/history`) : null) ||
         await tryGet("/api/me/progress/history");
 
-      // normaliza
       const items = Array.isArray(data?.items) ? data.items
         : Array.isArray(data?.data) ? data.data
         : Array.isArray(data) ? data
@@ -123,7 +118,6 @@ export default function WritingDiary() {
     fetchHistory();
   }, [fetchHistory]);
 
-  // export CSV dos resultados atuais (filtros + página)
   const exportCsv = useCallback(() => {
     const headers = ["Data", "Projeto", "Evento", "Fonte", "Palavras", "Notas"];
     const data = rows.map((r) => [
@@ -151,7 +145,6 @@ export default function WritingDiary() {
         )}
       </div>
 
-      {/* Filtros */}
       <HistoryFilters
         projects={projects}
         events={events}
@@ -162,11 +155,9 @@ export default function WritingDiary() {
         }}
       />
 
-      {/* Mensagens globais */}
       {err && <Alert type="error">{err}</Alert>}
       {msg && <Alert type="success">{msg}</Alert>}
 
-      {/* Loading skeleton */}
       {loading && (
         <div className="panel">
           <div className="space-y-2">
@@ -175,7 +166,6 @@ export default function WritingDiary() {
         </div>
       )}
 
-      {/* Vazio */}
       {!loading && !err && rows.length === 0 && (
         <EmptyState
           icon="users"
@@ -184,7 +174,6 @@ export default function WritingDiary() {
         />
       )}
 
-      {/* Tabela + paginação */}
       {hasData && <div className="panel">
         <HistoryTable loading={false} rows={rows} />
         <div className="mt-4">

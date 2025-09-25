@@ -1,55 +1,59 @@
 // src/api/events.js
 import axios from "axios";
 
+const api = axios.create({
+  baseURL: "/api",
+});
+
+// Lista eventos ativos
 export async function getActiveEvents() {
-  const { data } = await axios.get("/api/events/active");
-  return data;
+  const { data } = await api.get("/events/active");
+  return data; // EventDto[]
 }
 
-export async function getEventById(id) {
-  const { data } = await axios.get(`/api/events/${id}`);
-  return data;
+// (novo) Detalhe por id
+export async function getEventById(eventId) {
+  const { data } = await api.get(`/events/${eventId}`);
+  return data; // EventDto
 }
 
-/**
- * Retorna progresso do projeto no evento:
- * { percent, totalWritten, targetWords, dailyTarget, joined, won, ... }
- */
-export async function getEventProgress({ projectId, eventId }) {
-  const { data } = await axios.get(`/api/events/${eventId}/progress`, {
-    params: { projectId },
-  });
-  return data;
+// Progresso do projeto dentro do evento (rota com 2 path params)
+export async function getEventProgress(eventId, projectId) {
+  const { data } = await api.get(`/events/${eventId}/projects/${projectId}/progress`);
+  return data; // EventProgressDto
 }
 
-/** Inscreve um projeto no evento com uma meta (se omitido, usa a default do evento) */
-export async function joinEvent(eventId, { projectId, targetWords }) {
-  const { data } = await axios.post(`/api/events/${eventId}/join`, {
-    projectId,
-    targetWords,
-  });
-  return data;
+// Inscrever ou atualizar meta (upsert no back)
+export async function joinEvent({ eventId, projectId, targetWords }) {
+  await api.post("/events/join", { eventId, projectId, targetWords });
 }
 
-/** Atualiza a meta do projeto no evento */
-export async function updateProjectEvent(eventId, projectId, payload) {
-  const { data } = await axios.put(
-    `/api/events/${eventId}/projects/${projectId}`,
-    payload
-  );
-  return data;
+// Atualizar meta (mesma rota de join — upsert)
+export async function updateEventTarget({ eventId, projectId, targetWords }) {
+  await api.post("/events/join", { eventId, projectId, targetWords });
 }
 
-/** Remove o projeto do evento */
+// (novo) Sair do evento
 export async function leaveEvent(eventId, projectId) {
-  await axios.delete(`/api/events/${eventId}/projects/${projectId}`);
+  await api.delete(`/events/${eventId}/projects/${projectId}`);
 }
 
-/** Retorna a leaderboard do evento (scope: total|daily|weekly|monthly, top: número de posições) */
-
-export async function getEventLeaderboard(eventId, { scope = "total", top = 50 } = {}) {
-  const { data } = await axios.get(`/api/events/${eventId}/leaderboard`, {
+// Leaderboard
+export async function getEventLeaderboard(eventId, scope = "total", top = 50) {
+  const { data } = await api.get(`/events/${eventId}/leaderboard`, {
     params: { scope, top },
   });
-  return data; // [{ projectId, projectTitle, userName, words, percent, won, rank }, ...]
+  return data; // EventLeaderboardRowDto[]
+}
+
+// Validação (preview + validate) — usa seu controlador de validação existente
+export async function previewValidation(eventId, projectId) {
+  const { data } = await api.get(`/events/${eventId}/validate/preview`, {
+    params: { projectId },
+  });
+  return data; // { target, total }
+}
+
+export async function validateWinner(eventId, { projectId, words, source = "manual" }) {
+  await api.post(`/events/${eventId}/validate`, { projectId, words, source });
 }

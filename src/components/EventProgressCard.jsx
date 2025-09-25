@@ -1,16 +1,19 @@
 // src/components/EventProgressCard.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getActiveEvents,
   getEventById,
   getEventProgress,
 } from "../api/events";
+import EmptyState from "./EmptyState";
+import Skeleton from "./Skeleton"; // default import
+import Alert from "./Alert";
 
 /**
  * Props:
- *  - projectId: string | number   (obrigatório para mostrar progresso)
- *  - eventId?: string | number    (opcional; se não vier, usa o primeiro evento ativo)
+ *  - projectId: string | number
+ *  - eventId?: string | number
  */
 export default function EventProgressCard({ projectId, eventId: propEventId }) {
   const navigate = useNavigate();
@@ -21,7 +24,6 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
   const [eventId, setEventId] = useState(propEventId || "");
   const [progress, setProgress] = useState(null);
 
-  // ==== ring SVG minimalista (texto central 100% no centro) ====
   const Ring = ({ pct = 0, size = 80, stroke = 10, color = "#0f3a5f", track = "rgba(0,0,0,0.15)" }) => {
     const p = Math.min(100, Math.max(0, Number(pct) || 0));
     const r = (size - stroke) / 2;
@@ -43,67 +45,75 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
     );
   };
 
-  // ==== carregar evento "fonte da verdade" ====
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true); setErr("");
-      try {
-        let ev = null;
-        let id = propEventId;
+  const loadEvent = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      let ev = null;
+      let id = propEventId;
 
-        if (!id) {
-          const actives = await getActiveEvents();
-          const first = Array.isArray(actives) && actives.length ? actives[0] : null;
-          id = first?.id ?? first?.Id ?? "";
-          if (id) ev = first;
-        }
-
-        if (id && !ev) {
-          ev = await getEventById(id);
-        }
-
-        if (!alive) return;
-        setEventId(id || "");
-        setEvent(ev || null);
-      } catch (e) {
-        if (!alive) return;
-        setErr(e?.response?.data?.message || e?.message || "Falha ao carregar evento.");
-      } finally {
-        if (alive) setLoading(false);
+      if (!id) {
+        const actives = await getActiveEvents();
+        const first = Array.isArray(actives) && actives.length ? actives[0] : null;
+        id = first?.id ?? first?.Id ?? "";
+        if (id) ev = first;
       }
-    })();
-    return () => { alive = false; };
+
+      if (id && !ev) ev = await getEventById(id);
+
+      setEventId(id || "");
+      setEvent(ev || null);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e?.message || "Falha ao carregar evento.");
+      setEventId("");
+      setEvent(null);
+    } finally {
+      setLoading(false);
+    }
   }, [propEventId]);
 
-  // ==== carregar progresso do projeto no evento ====
   useEffect(() => {
     let alive = true;
-    if (!eventId || !projectId) { setProgress(null); return; }
     (async () => {
-      try {
-        const p = await getEventProgress({ eventId, projectId });
-        if (!alive) return;
-        setProgress(p || null);
-      } catch (e) {
-        if (!alive) return;
-        setProgress(null);
-      }
+      await loadEvent();
+      if (!alive) return;
     })();
     return () => { alive = false; };
-  }, [eventId, projectId]);
+  }, [loadEvent]);
+
+  const loadProgress = useCallback(async (eid, pid) => {
+    if (!eid || !pid) { setProgress(null); return; }
+    try {
+      const p = await getEventProgress({ eventId: eid, projectId: pid });
+      setProgress(p || null);
+    } catch {
+      setProgress(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      await loadProgress(eventId, projectId);
+      if (!alive) return;
+    })();
+    return () => { alive = false; };
+  }, [eventId, projectId, loadProgress]);
 
   const evName = event?.name ?? event?.Name ?? "Evento";
   const evStart = event?.startsAtUtc ?? event?.startsAt ?? event?.StartsAtUtc;
-  const evEnd   = event?.endsAtUtc   ?? event?.endsAt   ?? event?.EndsAtUtc;
-  const evDefaultTarget = Number(event?.defaultTargetWords ?? event?.DefaultTargetWords ?? 50000) || 50000;
+  const evEnd = event?.endsAtUtc ?? event?.endsAt ?? event?.EndsAtUtc;
+  const evDefaultTarget =
+    Number(event?.defaultTargetWords ?? event?.DefaultTargetWords ?? 50000) || 50000;
 
   const joined = !!(progress?.joined ?? progress?.isJoined ?? progress?.targetWords);
-  const won    = !!(progress?.won ?? progress?.Won ?? progress?.isWinner);
+  const won = !!(progress?.won ?? progress?.Won ?? progress?.isWinner);
   const target = Number(progress?.targetWords ?? progress?.TargetWords ?? evDefaultTarget) || evDefaultTarget;
-  const total  = Number(progress?.totalWritten ?? progress?.TotalWritten ?? 0) || 0;
-  const percent = Math.min(100, Math.max(0, Number(progress?.percent ?? progress?.Percent ?? (100 * total / Math.max(1, target)))));
-  const dailyTarget = Number(progress?.dailyTarget ?? progress?.DailyTarget ?? Math.ceil(target / 30)) || Math.ceil(target / 30);
+  const total = Number(progress?.totalWritten ?? progress?.TotalWritten ?? 0) || 0;
+  const percent = Math.min(
+    100,
+    Math.max(0, Number(progress?.percent ?? progress?.Percent ?? (100 * total) / Math.max(1, target)))
+  );
 
   const daysLeft = useMemo(() => {
     if (!evEnd) return null;
@@ -112,18 +122,108 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
     return Math.max(0, Math.ceil((end - today) / (1000*60*60*24)));
   }, [evEnd]);
 
-  if (loading) return (
-    <section className="panel">
-      <h2 className="section-title">Meta do Evento</h2>
-      <p className="text-sm text-muted">Carregando…</p>
-    </section>
-  );
+  if (loading) {
+    return (
+      <section className="panel">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-40 mt-2" />
+            <Skeleton className="h-3 w-32 mt-2" />
+          </div>
+          <Skeleton className="h-20 w-20 rounded-full" />
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+        </div>
+
+        <div className="mt-3">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-40 mt-2" />
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="h-9 w-52" />
+        </div>
+      </section>
+    );
+  }
+
+  if (err) {
+    return (
+      <section className="panel">
+        <h2 className="section-title">Meta do Evento</h2>
+        <Alert type="error">{err}</Alert>
+        <div className="mt-2">
+          <button className="button" onClick={loadEvent}>Tentar novamente</button>
+        </div>
+      </section>
+    );
+  }
 
   if (!eventId || !event) {
     return (
       <section className="panel">
         <h2 className="section-title">Meta do Evento</h2>
-        <p className="text-sm text-muted">Não há evento ativo no momento.</p>
+        <EmptyState
+          icon="calendar"
+          title="Nenhum evento ativo"
+          subtitle="Quando um evento estiver ativo, sua meta aparecerá aqui."
+          actions={[{ label: "Ver eventos", onClick: () => navigate("/events") }]}
+        />
+      </section>
+    );
+  }
+
+  if (!projectId) {
+    return (
+      <section className="panel">
+        <h2 className="section-title">Meta do Evento</h2>
+        <EmptyState
+          icon="alert"
+          title="Selecione um projeto"
+          subtitle="Escolha um projeto para acompanhar o progresso no evento."
+          actions={[{ label: "Ir para Projetos", onClick: () => navigate("/projects") }]}
+        />
+      </section>
+    );
+  }
+
+  if (eventId && projectId && !joined) {
+    return (
+      <section className="panel">
+        <h2 className="section-title">Meta do Evento</h2>
+        <EmptyState
+          icon="calendar"
+          title="Projeto não inscrito neste evento"
+          subtitle="Inscreva este projeto no evento para acompanhar sua meta e o progresso."
+          actions={[{
+            label: "Inscrever projeto",
+            onClick: () => navigate(`/events?eventId=${eventId}&projectId=${projectId}`),
+          }]}
+        />
+      </section>
+    );
+  }
+
+  if (joined && total === 0) {
+    return (
+      <section className="panel">
+        <h2 className="section-title">Meta do Evento</h2>
+        <EmptyState
+          icon="alert"
+          title="Sem progresso ainda"
+          subtitle="Registre suas primeiras palavras para ver a evolução no evento."
+          actions={[{
+            label: "Adicionar progresso",
+            onClick: () => navigate(`/events?eventId=${eventId}&projectId=${projectId}`),
+          }]}
+        />
       </section>
     );
   }
@@ -141,17 +241,15 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
             </p>
           )}
           <p className="text-xs text-muted mt-1">
-            {joined ? (won ? "Status: Winner 🏆" : "Status: Inscrito") : "Status: Projeto não inscrito"}
+            {won ? "Status: Winner 🏆" : "Status: Inscrito"}
           </p>
         </div>
 
-        {/* donut compacto do evento */}
         <div className="flex-shrink-0">
           <Ring pct={percent} />
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="kpi">
           <div className="label">Total no evento</div>
@@ -170,12 +268,11 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
         </div>
         <div className="kpi">
           <div className="label">Meta diária</div>
-          <div className="value">{dailyTarget.toLocaleString("pt-BR")}</div>
+          <div className="value">{Math.ceil(target / 30).toLocaleString("pt-BR")}</div>
           <div className="hint">estimada</div>
         </div>
       </div>
 
-      {/* Barra de progresso linear */}
       <div className="mt-3">
         <div className="progress">
           <div className="fill" style={{ width: `${Math.round(percent)}%` }} />
@@ -187,42 +284,26 @@ export default function EventProgressCard({ projectId, eventId: propEventId }) {
         )}
       </div>
 
-      {/* Ações */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {!joined ? (
+        <button
+          className="button"
+          type="button"
+          onClick={() => navigate(`/events?eventId=${eventId}&projectId=${projectId ?? ""}`)}
+        >
+          Gerenciar evento
+        </button>
+
+        {percent >= 100 && !won && (
           <button
             className="btn-primary"
             type="button"
-            onClick={() => navigate(`/events?eventId=${eventId}&projectId=${projectId ?? ""}`)}
-            disabled={!projectId}
+            onClick={() => navigate(`/validate?projectId=${projectId}&eventId=${eventId}`)}
           >
-            Inscrever este projeto
+            Validar e virar Winner 🎉
           </button>
-        ) : (
-          <>
-            <button
-              className="button"
-              type="button"
-              onClick={() => navigate(`/events?eventId=${eventId}&projectId=${projectId ?? ""}`)}
-            >
-              Gerenciar evento
-            </button>
-
-            {percent >= 100 && !won && (
-              <button
-                className="btn-primary"
-                type="button"
-                onClick={() => navigate(`/validate?projectId=${projectId}&eventId=${eventId}`)}
-              >
-                Validar e virar Winner 🎉
-              </button>
-            )}
-            {won && <span className="text-green-700 dark:text-green-400">🏆 Winner</span>}
-          </>
         )}
+        {won && <span className="text-green-700 dark:text-green-400">🏆 Winner</span>}
       </div>
-
-      {err && <p className="text-red-600 mt-2">{err}</p>}
     </section>
   );
 }

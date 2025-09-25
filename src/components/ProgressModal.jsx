@@ -1,141 +1,101 @@
 // src/components/ProgressModal.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import * as ProjectsAPI from "../api/projects";
+import Alert from "./Alert.jsx";
 
 /**
  * Props:
  *  - open: boolean
- *  - onClose: fn()
- *  - projectId?: string
- *  - onSaved?: fn()
- *  - defaultWords?: number
- *  - defaultNote?: string
+ *  - onClose: () => void
+ *  - projectId: string | number (obrigatório)
+ *  - eventId?: string | number  (opcional, mas melhora o vínculo)
+ *  - onSaved?: () => void       (callback após salvar)
  */
-export default function ProgressModal({
-  open,
-  onClose,
-  projectId,
-  onSaved,
-  defaultWords,
-  defaultNote,
-}) {
-  const [projects, setProjects] = useState([]);
-  const [pid, setPid] = useState(projectId || "");
-  const [words, setWords] = useState(0);
-  const [note, setNote] = useState("");
+export default function ProgressModal({ open, onClose, projectId, eventId, onSaved }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [loading, setLoading] = useState(false);
+  const [words, setWords] = useState("");
+  const [source, setSource] = useState("manual");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
 
-  // carrega projetos se não veio pid
   useEffect(() => {
-    let alive = true;
-    if (!open) return;
-    (async () => {
+    if (open) {
       setErr("");
-      try {
-        if (!projectId && ProjectsAPI.getProjects) {
-          const list = await ProjectsAPI.getProjects();
-          if (!alive) return;
-          const arr = Array.isArray(list) ? list : [];
-          setProjects(arr);
-          const first = arr[0];
-          if (first) setPid(first.id ?? first.projectId ?? "");
-        } else {
-          setProjects([]);
-          setPid(projectId || "");
-        }
-      } catch (e) {
-        setErr(e?.response?.data?.message || e?.message || "Falha ao carregar projetos.");
-      }
-    })();
-    return () => { alive = false; };
-  }, [open, projectId]);
+      setMsg("");
+      setWords("");
+      setSource("manual");
+      setNotes("");
+      setDate(new Date().toISOString().slice(0, 10));
+    }
+  }, [open]);
 
-  // aplica defaults ao abrir
-  useEffect(() => {
-    if (!open) return;
-    setWords(Number(defaultWords) || 0);
-    setNote(defaultNote || "");
-    setDate(new Date().toISOString().slice(0, 10));
-  }, [open, defaultWords, defaultNote]);
+  const valid = useMemo(() => {
+    const n = Number(words);
+    return projectId && !isNaN(n) && n > 0 && date;
+  }, [projectId, words, date]);
 
-  const submittingFn = useMemo(() => {
-    // tenta descobrir a função de criação existente
-    return (
-      ProjectsAPI.addWritingEntry ||
-      ProjectsAPI.addProjectProgress ||
-      ProjectsAPI.addProgress ||
-      ProjectsAPI.createWritingEntry ||
-      ProjectsAPI.createProgress ||
-      null
-    );
-  }, []);
+  const save = async () => {
+    if (!valid) return;
+    setBusy(true); setErr(""); setMsg("");
 
-  const canSubmit = pid && Number.isFinite(Number(words)) && Number(words) > 0;
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    setErr("");
     try {
       const payload = {
-        words: Number(words),
-        note: note?.trim() || null,
+        projectId,
+        eventId: eventId || undefined,
         date, // YYYY-MM-DD
+        words: Number(words),
+        source,
+        notes: notes?.trim() || undefined,
       };
 
-      if (typeof submittingFn === "function") {
-        await submittingFn(pid, payload);
-      } else {
-        // fallback genérico
-        await axios.post(`/api/projects/${pid}/progress`, payload);
+      // Tente endpoints comuns em ordem
+      const tryPost = async (url) => {
+        try { const r = await axios.post(url, payload); return r?.data || true; } catch { return null; }
+      };
+
+      // 1) /api/progress (genérico)
+      let ok =
+        await tryPost("/api/progress") ||
+        // 2) /api/projects/{projectId}/progress
+        await tryPost(`/api/projects/${projectId}/progress`) ||
+        // 3) /api/events/{eventId}/progress (se houver)
+        (eventId ? await tryPost(`/api/events/${eventId}/progress`) : null);
+
+      if (!ok) {
+        throw new Error("Não foi possível lançar o progresso.");
       }
 
+      setMsg("Progresso lançado com sucesso.");
       onSaved?.();
-      onClose?.();
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Não foi possível salvar o progresso.");
+      setErr(e?.response?.data?.message || e?.message || "Falha ao lançar o progresso.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-header">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/40" onClick={busy ? undefined : onClose} />
+
+      {/* modal */}
+      <div className="relative z-10 w-full max-w-lg rounded-xl bg-white dark:bg-neutral-900 shadow-xl p-5">
+        <div className="flex items-start justify-between">
           <h3 className="text-lg font-semibold">Adicionar progresso</h3>
-          <button className="button" onClick={onClose} aria-label="Fechar">✕</button>
+          <button className="button" onClick={onClose} disabled={busy}>Fechar</button>
         </div>
 
-        {err && <p className="text-red-600 mt-1">{err}</p>}
+        {/* mensagens */}
+        {err && <Alert type="error">{err}</Alert>}
+        {msg && <Alert type="success">{msg}</Alert>}
 
-        <div className="modal-body space-y-3">
-          {/* Projeto */}
-          {!projectId && (
-            <label className="flex flex-col gap-1">
-              <span className="label">Projeto</span>
-              <select
-                className="input"
-                value={pid}
-                onChange={(e) => setPid(e.target.value)}
-                disabled={loading}
-              >
-                {!projects.length && <option>Sem projetos</option>}
-                {projects.map((p) => (
-                  <option key={p.id ?? p.projectId} value={p.id ?? p.projectId}>
-                    {p.title ?? p.name ?? "Projeto"}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {/* Data */}
+        {/* form */}
+        <div className="grid md:grid-cols-2 gap-3 mt-3">
           <label className="flex flex-col gap-1">
             <span className="label">Data</span>
             <input
@@ -143,46 +103,50 @@ export default function ProgressModal({
               className="input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              disabled={loading}
+              max={new Date().toISOString().slice(0,10)}
             />
           </label>
 
-          {/* Palavras */}
           <label className="flex flex-col gap-1">
-            <span className="label">Palavras</span>
+            <span className="label">Palavras adicionadas</span>
             <input
               type="number"
               min={1}
               step={1}
               className="input"
               value={words}
-              onChange={(e) => setWords(Math.max(0, Number(e.target.value) || 0))}
-              disabled={loading}
+              onChange={(e) => setWords(e.target.value)}
+              placeholder="ex: 500"
             />
           </label>
 
-          {/* Nota */}
           <label className="flex flex-col gap-1">
-            <span className="label">Nota (opcional)</span>
+            <span className="label">Fonte</span>
+            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="manual">Manual</option>
+              <option value="sprint">Sprint</option>
+              <option value="import">Importação</option>
+              <option value="api">API</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="label">Notas (opcional)</span>
             <textarea
               className="input"
               rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              disabled={loading}
-              placeholder="Ex.: Sprint de 20min, cena 3 finalizada…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observações sobre este lançamento…"
             />
           </label>
         </div>
 
-        <div className="modal-footer">
-          <button className="button" onClick={onClose} disabled={loading}>Cancelar</button>
-          <button
-            className="btn-primary"
-            onClick={submit}
-            disabled={!canSubmit || loading}
-          >
-            {loading ? "Salvando…" : "Salvar progresso"}
+        {/* ações */}
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button className="button" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="btn-primary" onClick={save} disabled={!valid || busy}>
+            {busy ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </div>

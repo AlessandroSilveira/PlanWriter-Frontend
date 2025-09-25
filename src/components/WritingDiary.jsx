@@ -1,4 +1,3 @@
-// src/pages/WritingDiary.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import HistoryFilters from "../components/HistoryFilters.jsx";
@@ -9,7 +8,6 @@ import { Skeleton } from "../components/Skeleton.jsx";
 import { downloadCSV } from "../utils/csv";
 import { getProjects } from "../api/projects";
 import { getActiveEvents } from "../api/events";
-import Alert from "../components/Alert.jsx";
 
 // helpers
 const fmtDateBR = (d) => {
@@ -38,7 +36,6 @@ export default function WritingDiary() {
   // loading / error / rows
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [msg, setMsg] = useState(""); // sucesso/infos
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
 
@@ -58,7 +55,7 @@ export default function WritingDiary() {
 
   // fetcher with fallbacks
   const fetchHistory = useCallback(async () => {
-    setLoading(true); setErr(""); setMsg("");
+    setLoading(true); setErr("");
     try {
       const params = {
         projectId: filters.projectId || undefined,
@@ -137,7 +134,6 @@ export default function WritingDiary() {
     const dateStr = new Date().toISOString().slice(0,10);
     const filename = `diario_escrita_${dateStr}.csv`;
     downloadCSV(filename, headers, data);
-    setMsg("Exportado com sucesso.");
   }, [rows]);
 
   const hasData = useMemo(() => !loading && !err && rows.length > 0, [loading, err, rows]);
@@ -157,14 +153,11 @@ export default function WritingDiary() {
         events={events}
         initial={filters}
         onChange={(f) => {
+          // quando mexe nos filtros, volta pra página 1
           setFilters((prev) => ({ ...prev, ...f, submit: undefined }));
           if (f.submit) setPage(1);
         }}
       />
-
-      {/* Mensagens globais */}
-      {err && <Alert type="error">{err}</Alert>}
-      {msg && <Alert type="success">{msg}</Alert>}
 
       {/* Loading skeleton */}
       {loading && (
@@ -173,6 +166,16 @@ export default function WritingDiary() {
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
           </div>
         </div>
+      )}
+
+      {/* Erro */}
+      {!loading && err && (
+        <EmptyState
+          icon="alert"
+          title="Não foi possível carregar o histórico"
+          subtitle={String(err)}
+          actions={[{ label: "Tentar novamente", onClick: fetchHistory }]}
+        />
       )}
 
       {/* Vazio */}
@@ -184,9 +187,10 @@ export default function WritingDiary() {
         />
       )}
 
-      {/* Tabela + paginação */}
+      {/* Tabela */}
       {hasData && <div className="panel">
         <HistoryTable loading={false} rows={rows} />
+
         <div className="mt-4">
           <Pagination
             page={page}
