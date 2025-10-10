@@ -150,6 +150,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+  path="/regions"
+  element={
+    <ProtectedRoute>
+      <RegionsLeaderboard />
+    </ProtectedRoute>
+  }
+/>
 
         {/* Opcional: rota 404
         <Route path="*" element={<NotFound />} />

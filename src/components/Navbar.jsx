@@ -58,6 +58,11 @@ export default function Navbar({ onLoginClick }) {
               {/* Se quiser habilitar Recursos, tire o comentário abaixo */}
               {/* <NavLink to="/recursos" className={linkClass}>Recursos</NavLink> */}
               <NavLink to="/events" className={linkClass}>Eventos</NavLink>
+              <NavLink to="/regions" className={linkClass}>Regiões</NavLink>
+
+              {/* >>> NOVO LINK */}
+              <NavLink to="/buddies" className={linkClass}>Buddies</NavLink>
+
               <button className="btn-primary" onClick={goQuickLog} type="button">
                 + Registrar
               </button>
