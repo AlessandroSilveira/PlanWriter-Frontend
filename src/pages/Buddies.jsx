@@ -5,7 +5,7 @@ import {
   followByUsername,
   unfollow,
   buddiesLeaderboard,
-} from "@/api/buddies";
+} from "../api/buddies";
 
 function clsx(...c) {
   return c.filter(Boolean).join(" ");

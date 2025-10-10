@@ -23,6 +23,8 @@ import Validate from "./pages/Validate.jsx";
 import Certificate from "./pages/Certificate.jsx";
 import Events from "./pages/Events.jsx";
 import WritingDiary from "./pages/WritingDiary.jsx"; // << Diário da Escrita
+import RegionsLeaderboard from "./pages/RegionsLeaderboard.jsx";
+import Buddies from "./pages/Buddies.jsx";
 
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -151,13 +153,21 @@ export default function App() {
           }
         />
         <Route
-  path="/regions"
-  element={
-    <ProtectedRoute>
-      <RegionsLeaderboard />
-    </ProtectedRoute>
-  }
-/>
+          path="/regions"
+          element={
+            <ProtectedRoute>
+              <RegionsLeaderboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/buddies"
+          element={
+            <ProtectedRoute>
+              <Buddies />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Opcional: rota 404
         <Route path="*" element={<NotFound />} />

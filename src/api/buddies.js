@@ -1,5 +1,5 @@
 // src/api/buddies.js
-import { api } from "./client"; // seu wrapper (axios/fetch) já existente
+import api from "./http"; // wrapper axios já existente
 
 export async function listBuddies() {
   const { data } = await api.get("/buddies");
