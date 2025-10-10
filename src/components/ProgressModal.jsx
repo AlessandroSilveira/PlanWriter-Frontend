@@ -1,5 +1,5 @@
 // src/components/ProgressModal.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import Alert from "./Alert.jsx";
 
@@ -10,8 +10,18 @@ import Alert from "./Alert.jsx";
  *  - projectId: string | number (obrigatório)
  *  - eventId?: string | number  (opcional, mas melhora o vínculo)
  *  - onSaved?: () => void       (callback após salvar)
+ *  - defaultWords?: number      (pré-preenche o campo de palavras)
+ *  - defaultNote?: string       (pré-preenche o campo de notas)
  */
-export default function ProgressModal({ open, onClose, projectId, eventId, onSaved }) {
+export default function ProgressModal({
+  open,
+  onClose,
+  projectId,
+  eventId,
+  onSaved,
+  defaultWords,
+  defaultNote,
+}) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [words, setWords] = useState("");
   const [source, setSource] = useState("manual");
@@ -20,16 +30,25 @@ export default function ProgressModal({ open, onClose, projectId, eventId, onSav
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
 
+  const wasOpen = useRef(false);
+
   useEffect(() => {
-    if (open) {
+    const justOpened = open && !wasOpen.current;
+    wasOpen.current = open;
+
+    if (justOpened) {
       setErr("");
       setMsg("");
-      setWords("");
+      setWords(
+        defaultWords === undefined || defaultWords === null || Number(defaultWords) <= 0
+          ? ""
+          : String(defaultWords)
+      );
       setSource("manual");
-      setNotes("");
+      setNotes(defaultNote ? String(defaultNote) : "");
       setDate(new Date().toISOString().slice(0, 10));
     }
-  }, [open]);
+  }, [open, defaultWords, defaultNote]);
 
   const valid = useMemo(() => {
     const n = Number(words);
