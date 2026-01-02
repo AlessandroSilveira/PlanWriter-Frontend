@@ -1,6 +1,6 @@
 // src/components/RecentBadges.jsx
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/http";
 
 /**
  * Props:
@@ -15,7 +15,7 @@ export default function RecentBadges({ projectId, take = 6 }) {
     if (!projectId) return;
     (async () => {
       try {
-        const { data } = await axios.get(`/api/Badges/projectId/${projectId}`);
+        const { data } = await api.get(`/badges/projectid/${projectId}`);
         const arr = Array.isArray(data) ? data.slice(0, take) : [];
         setList(arr);
       } catch (e) {

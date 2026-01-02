@@ -145,38 +145,72 @@ export default function ProfileMe() {
         </div>
       </section>
 
-      <section className="panel">
-        <h2 className="section-title">Projetos visíveis no perfil</h2>
-        {!projects?.length ? (
-          <p className="text-muted mt-2">Você ainda não tem projetos.</p>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-            {projects.map(p => {
-              const id = p.id ?? p.projectId;
-              const on = publicIds.has(id);
-              const title = p.title ?? p.name ?? "Projeto";
-              const cur = Number(p.currentWordCount ?? 0);
-              const goal = Number(p.wordCountGoal ?? 0);
-              return (
-                <label key={id} className="p-3 border rounded flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleProject(id)}
-                    className="mt-1"
+     <section className="panel">
+  <h2 className="section-title">Projetos visíveis no perfil</h2>
+
+  {!projects?.length ? (
+    <p className="text-muted mt-2">Você ainda não tem projetos.</p>
+  ) : (
+    <div className="mt-4 space-y-4">
+      {projects.map((p) => {
+        const id = p.id ?? p.projectId;
+        const checked = publicIds.has(id);
+        const title = p.title ?? p.name ?? "Projeto";
+        const current = Number(p.currentWordCount ?? 0);
+        const goal = Number(p.wordCountGoal ?? 0);
+        const pct =
+          goal > 0
+            ? Math.min(100, Math.round((current / goal) * 100))
+            : 0;
+
+        return (
+          <div
+            key={id}
+            className="grid grid-cols-[24px_1fr] gap-4 items-start"
+          >
+            {/* Checkbox */}
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => toggleProject(id)}
+              className="mt-1"
+            />
+
+            {/* Conteúdo */}
+            <div className="space-y-2">
+              {/* Título */}
+              <div className="font-semibold text-base">
+                {title}
+              </div>
+
+              {/* Números */}
+              <div className="text-sm text-muted">
+                {current.toLocaleString("pt-BR")} /{" "}
+                {goal.toLocaleString("pt-BR")} palavras
+              </div>
+
+              {/* Barra */}
+              <div className="grid grid-cols-[1fr_auto] gap-3 items-center">
+                <div className="h-2 bg-black/10 dark:bg-white/10 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-green-600"
+                    style={{ width: `${pct}%` }}
                   />
-                  <div className="flex-1">
-                    <div className="font-semibold">{title}</div>
-                    <div className="text-sm text-muted">
-                      {cur.toLocaleString("pt-BR")} / {goal?.toLocaleString("pt-BR")} palavras
-                    </div>
-                  </div>
-                </label>
-              );
-            })}
+                </div>
+                <span className="text-xs text-muted">
+                  {pct}%
+                </span>
+              </div>
+            </div>
           </div>
-        )}
-      </section>
+        );
+      })}
+    </div>
+  )}
+</section>
+
+
+
     </div>
   );
 }

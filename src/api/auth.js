@@ -1,16 +1,33 @@
 // src/api/auth.js
 import api from "./http";
 
-export const loginApi = async (email, password) => {
-  // envia campos redundantes para compatibilidade com DTOs diferentes
-  const body = { email, username: email, login: email, password };
-  const { data } = await api.post("/auth/login", body);
-  const token = data?.AccessToken || data?.accessToken || data?.token || data?.jwt || null;
-  return { raw: data, token };
-};
-
-export const registerApi = async (email, password) => {
-  const body = { email, username: email, login: email, password };
-  const { data } = await api.post("/auth/register", body);
+export async function login({ email, password }) {
+  const { data } = await api.post("/auth/login", { email, password });
   return data;
-};
+}
+
+// 👇 alias para compatibilidade
+export const loginApi = login;
+
+export async function register({ firstName, lastName, dateOfBirth, email, password }) {
+  // Garante formato de data compatível: "YYYY-MM-DD"
+  const formattedDate = new Date(dateOfBirth).toISOString().split("T")[0];
+
+  const payload = {
+    FirstName: firstName,
+    LastName: lastName,
+    DateOfBirth: formattedDate,
+    Email: email,
+    Password: password,
+  };
+
+  console.log("📦 Enviando para backend:", payload);
+
+  const { data } = await api.post("/auth/register", payload);
+  return data;
+}
+export function logout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("jwt");
+}

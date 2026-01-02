@@ -2,165 +2,182 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createProject } from "../api/projects";
-import { api } from "../api/client"; // << para chamar /projects/{id}/goal
 
 export default function NewProject() {
   const navigate = useNavigate();
 
-  const [title, setTitle] = useState("");
-  const [goalAmount, setGoalAmount] = useState("");      // << novo (valor numérico)
-  const [goalUnit, setGoalUnit] = useState("Words");     // << novo: Words | Minutes | Pages
-  const [genre, setGenre] = useState("");
-  const [deadline, setDeadline] = useState("");          // YYYY-MM-DD
-  const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+  const [form, setForm] = useState({
+    title: "",
+    goal: 50000,
+    genre: "",
+    startDate: "",
+    endDate: "",
+    description: "",
+  });
 
-  const unitLabel =
-    goalUnit === "Minutes" ? "minutos" :
-    goalUnit === "Pages"   ? "páginas" : "palavras";
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({
+      ...f,
+      [name]: name === "goal" ? Number(value) : value,
+    }));
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setErr("");
     setSaving(true);
+    setError("");
+
     try {
-      // 1) Cria o projeto (mantendo compat com back antigo que espera wordCountGoal)
-      const payloadCreate = {
-        title,
-        description,
-        // se for Words, manda também o campo legado para não quebrar back antigo
-        wordCountGoal: goalUnit === "Words" ? Number(goalAmount || 0) : undefined,
-        deadline,
-        genre,
-        // se seu CreateProjectDto já aceitar flexível, pode incluir:
-        goalAmount: Number(goalAmount || 0),
-        goalUnit, // "Words" | "Minutes" | "Pages"
+      if (!form.title.trim()) throw new Error("Informe um título.");
+      if (!form.genre.trim()) throw new Error("Informe um gênero.");
+      if (!form.goal || form.goal <= 0)
+        throw new Error("A meta deve ser maior que zero.");
+
+      // Payload final enviado para API
+   const payload = {
+        title: form.title.trim(),
+        description: form.description?.trim() || null,
+        genre: form.genre,
+        wordCountGoal: Number(form.goal) || null, // 🔥 nome correto
+        startDate: form.startDate || null,         // 🔥 enviado
+        deadline: form.endDate || null              // 🔥 enviado
       };
 
-      const created = await createProject(payloadCreate);
-      const pid = created?.id ?? created?.projectId;
-      if (!pid) throw new Error("Projeto criado sem ID.");
 
-      // 2) Define a meta flexível (sempre) usando o endpoint /projects/{id}/goal
-      // DTO esperado: { goalAmount, goalUnit, deadline? }
-      await api.post(`/projects/${pid}/goal`, {
-        goalAmount: Number(goalAmount || 0),
-        goalUnit,
-        deadline: deadline || null,
-      });
+      const created = await createProject(payload);
+      const id =
+        created?.id || created?.projectId || created?.data?.id || null;
 
-      navigate(`/projects/${pid}`);
-    } catch (ex) {
+      navigate(id ? `/projects/${id}` : "/projects");
+    } catch (err) {
       const msg =
-        ex?.response?.data?.message ||
-        ex?.response?.data ||
-        ex?.message ||
-        "Falha ao criar o projeto.";
-      setErr(typeof msg === "string" ? msg : "Falha ao criar o projeto.");
+        err?.response?.data?.message ||
+        err?.message ||
+        "Não foi possível criar o projeto.";
+      setError(msg);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="py-6 space-y-6">
-      {/* BOX 1600px */}
-      <div className="container container--wide">
-        <section className="panel section-panel">
-          <div className="flex items-center justify-between">
-            <h2 className="section-title">Novo projeto</h2>
-            <Link to="/" className="btn-primary">Voltar</Link>
+    <div className="container mt-6">
+      <section className="panel max-w-3xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Novo Projeto</h1>
+          <Link to="/projects" className="text-sm text-indigo-600 hover:underline">
+            Voltar
+          </Link>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-5">
+          {/* TÍTULO */}
+          <div>
+            <label className="block text-sm mb-1">Título</label>
+            <input
+              name="title"
+              value={form.title}
+              onChange={onChange}
+              className="input w-full"
+              placeholder="Meu romance de novembro"
+            />
           </div>
 
-          <form onSubmit={onSubmit} className="form-stack mt-4">
-            {/* Linha 1: Título e Meta (valor + unidade) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">Título</label>
-                <input
-                  type="text"
-                  className="input w-full"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Meta ({unitLabel})</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    className="input w-full"
-                    value={goalAmount}
-                    onChange={(e) => setGoalAmount(e.target.value)}
-                    placeholder={
-                      goalUnit === "Minutes" ? "ex.: 3000" :
-                      goalUnit === "Pages"   ? "ex.: 200"  :
-                                               "ex.: 50000"
-                    }
-                  />
-                  <select
-                    className="input"
-                    value={goalUnit}
-                    onChange={(e) => setGoalUnit(e.target.value)}
-                  >
-                    <option value="Words">Palavras</option>
-                    <option value="Minutes">Minutos</option>
-                    <option value="Pages">Páginas</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+          {/* GÊNERO */}
+          <div>
+            <label className="block text-sm mb-1">Gênero</label>
+            <select
+              name="genre"
+              value={form.genre}
+              onChange={onChange}
+              className="input w-full"
+            >
+              <option value="">Selecione um gênero…</option>
+              <option value="Romance">Romance</option>
+              <option value="Fantasia">Fantasia</option>
+              <option value="Ficção Científica">Ficção Científica</option>
+              <option value="Suspense">Suspense</option>
+              <option value="Terror">Terror</option>
+              <option value="Drama">Drama</option>
+              <option value="Não Ficção">Não Ficção</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
 
-            {/* Linha 2: Gênero e Prazo */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">Gênero</label>
-                <input
-                  type="text"
-                  className="input w-full"
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                  placeholder="ex.: Romance"
-                />
-              </div>
-              <div>
-                <label className="label">Prazo</label>
-                <input
-                  type="date"
-                  className="input w-full"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                />
-              </div>
-            </div>
+          {/* META */}
+          <div>
+            <label className="block text-sm mb-1">Meta (palavras)</label>
+            <input
+              type="number"
+              name="goal"
+              value={form.goal}
+              onChange={onChange}
+              className="input w-full"
+              min={1}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Ex.: 50000 (padrão NaNoWriMo)
+            </p>
+          </div>
 
-            {/* Linha 3: Descrição */}
+          {/* DATAS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="label">Descrição</label>
-              <textarea
-                rows={4}
+              <label className="block text-sm mb-1">Início</label>
+              <input
+                type="date"
+                name="startDate"
+                value={form.startDate}
+                onChange={onChange}
                 className="input w-full"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Fale um pouco sobre o projeto…"
               />
             </div>
-
-            {/* Linha 4: Botões */}
-            <div className="flex gap-3">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Salvando..." : "Salvar projeto"}
-              </button>
-              <Link to="/" className="button">Cancelar</Link>
+            <div>
+              <label className="block text-sm mb-1">Fim</label>
+              <input
+                type="date"
+                name="endDate"
+                value={form.endDate}
+                onChange={onChange}
+                className="input w-full"
+              />
             </div>
+          </div>
 
-            {err && <div className="text-red-600 mt-3">{err}</div>}
-          </form>
-        </section>
-      </div>
+          {/* DESCRIÇÃO */}
+          <div>
+            <label className="block text-sm mb-1">Descrição</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={onChange}
+              rows={4}
+              className="input w-full resize-none"
+              placeholder="Resumo do projeto..."
+            />
+          </div>
+
+          {/* ERRO */}
+          {error && (
+            <p className="text-sm text-red-600 border border-red-200 bg-red-50 p-3 rounded">
+              {error}
+            </p>
+          )}
+
+          {/* BOTÃO */}
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn-primary w-full md:w-auto px-6 py-2"
+          >
+            {saving ? "Criando…" : "Criar projeto"}
+          </button>
+        </form>
+      </section>
     </div>
   );
 }

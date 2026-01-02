@@ -1,126 +1,191 @@
+// src/pages/Register.jsx
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import api from "../api/http";
+import { useNavigate, Link } from "react-router-dom";
+import { register, login } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
+  const { setToken } = useAuth();
+
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    dateOfBirth: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
 
-  const onSubmit = async (e) => {
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErr("");
+    setError("");
 
-    if (!name?.trim()) return setErr("Informe seu nome.");
-    if (!email?.trim()) return setErr("Informe seu e-mail.");
-    if (password.length < 6) return setErr("A senha deve ter pelo menos 6 caracteres.");
-    if (password !== confirm) return setErr("As senhas não conferem.");
+    if (form.password !== form.confirmPassword) {
+      setError("As senhas não coincidem.");
+      return;
+    }
 
-    setLoading(true);
     try {
-      await api.post("/auth/register", { name: name.trim(), email: email.trim(), password });
-      navigate("/login");
-    } catch (error) {
-      const apiMsg =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        (typeof error?.response?.data === "string" ? error.response.data : null);
-      setErr(apiMsg || "Falha no cadastro. Verifique os dados e tente novamente.");
+      setLoading(true);
+      // 1️⃣ faz o registro
+      await register({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        dateOfBirth: form.dateOfBirth,
+        email: form.email,
+        password: form.password,
+      });
+
+      // 2️⃣ login automático
+      const loginRes = await login({ email: form.email, password: form.password });
+      const token =
+        loginRes?.token ||
+        loginRes?.accessToken ||
+        loginRes?.jwt ||
+        loginRes?.data?.token ||
+        null;
+
+      if (!token) throw new Error("Token não retornado pelo servidor.");
+
+      // 3️⃣ guarda token e redireciona
+      localStorage.setItem("token", token);
+      setToken(token);
+      navigate("/dashboard");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Falha no cadastro. Verifique os dados e tente novamente.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen grid place-items-center px-4">
-      <div className="panel section-panel w-full max-w-md">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-10 w-10 rounded-xl bg-[color:var(--brand)] text-white grid place-items-center font-extrabold shadow-sm">
+    <div className="min-h-screen flex items-center justify-center bg-[#f8f3ec] px-4">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-center w-10 h-10 bg-[#004f5d] rounded-full text-white font-bold">
             PW
           </div>
           <div>
-            <h1 className="h2 m-0">Criar conta</h1>
-            <p className="subhead m-0">Bem-vindo ao PlanWriter</p>
+            <h1 className="text-xl font-semibold">Criar conta</h1>
+            <p className="text-sm text-gray-500">Bem-vindo ao PlanWriter</p>
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="grid gap-3 mt-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Nome</label>
+              <input
+                type="text"
+                name="firstName"
+                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                value={form.firstName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Sobrenome</label>
+              <input
+                type="text"
+                name="lastName"
+                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                value={form.lastName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="kicker">Nome</label>
+            <label className="block text-sm font-medium mb-1">Data de nascimento</label>
             <input
-              type="text"
-              placeholder="Seu nome"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
+              type="date"
+              name="dateOfBirth"
+              className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              value={form.dateOfBirth}
+              onChange={handleChange}
               required
             />
           </div>
 
           <div>
-            <label className="kicker">E-mail</label>
+            <label className="block text-sm font-medium mb-1">E-mail</label>
             <input
               type="email"
-              placeholder="voce@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              name="email"
+              className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              value={form.email}
+              onChange={handleChange}
               required
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="kicker">Senha</label>
-              <button
-                type="button"
-                className="button secondary px-2 py-1"
-                onClick={() => setShow((s) => !s)}
-              >
-                {show ? "Ocultar" : "Mostrar"}
-              </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Senha</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  className="w-full border rounded-lg p-2 text-sm pr-16 focus:ring-2 focus:ring-indigo-500"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
             </div>
-            <input
-              type={show ? "text" : "password"}
-              placeholder="Crie uma senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirmar senha</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="kicker">Confirmar senha</label>
-            <input
-              type={show ? "text" : "password"}
-              placeholder="Repita a senha"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-              required
-            />
+          {error && <div className="text-sm text-red-600 text-center">{error}</div>}
+
+          <div className="flex justify-end mt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition"
+            >
+              {loading ? "Criando..." : "Criar conta"}
+            </button>
           </div>
-
-          {err && <p className="text-red-600 text-sm">{err}</p>}
-
-          <button type="submit" className="button" disabled={loading}>
-            {loading ? "Criando..." : "Criar conta"}
-          </button>
         </form>
 
-        <div className="hr-soft mt-4" />
-        <p className="text-muted text-sm mt-3">
-          Já tem conta?{" "}
-          <Link to="/login" className="underline">
+        <div className="text-center mt-6 text-sm">
+          Já tem conta? {" "}
+          <Link to="/login" className="text-indigo-600 font-medium hover:underline">
             Entrar
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );

@@ -1,35 +1,36 @@
 // src/components/ProgressModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import axios from "axios";
+import api from "../api/http"; 
 import Alert from "./Alert.jsx";
 
 /**
  * Props:
  *  - open: boolean
  *  - onClose: () => void
- *  - projectId: string | number (obrigatório)
- *  - eventId?: string | number  (opcional – ignorado no POST atual)
- *  - onSaved?: () => void       (callback após salvar)
- *  - defaultWords?: number      (pré-preenche o campo de palavras)
- *  - defaultNote?: string       (pré-preenche o campo de notas)
+ *  - projectId: string | number
+ *  - goalUnit: "Words" | "Minutes" | "Pages"
+ *  - initialDate?: string (ISO yyyy-mm-dd)
+ *  - onSaved?: () => void
+ *  - defaultWords?: number
+ *  - defaultNote?: string
  */
 export default function ProgressModal({
   open,
   onClose,
   projectId,
-  eventId,
+  goalUnit = "Words",
+  initialDate,
   onSaved,
   defaultWords,
   defaultNote,
 }) {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-
-  // valores por unidade
+  /* ---------------- State ---------------- */
+  const [date, setDate] = useState("");
   const [words, setWords] = useState("");
   const [minutes, setMinutes] = useState("");
   const [pages, setPages] = useState("");
 
-  const [source, setSource] = useState("manual"); // mantido para UX
+  const [source, setSource] = useState("manual");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -37,6 +38,7 @@ export default function ProgressModal({
 
   const wasOpen = useRef(false);
 
+  /* ---------------- Reset ao abrir ---------------- */
   useEffect(() => {
     const justOpened = open && !wasOpen.current;
     wasOpen.current = open;
@@ -44,52 +46,67 @@ export default function ProgressModal({
     if (justOpened) {
       setErr("");
       setMsg("");
-      setWords(
-        defaultWords === undefined || defaultWords === null || Number(defaultWords) <= 0
-          ? ""
-          : String(defaultWords)
-      );
       setSource("manual");
-      setNotes(defaultNote ? String(defaultNote) : "");
-      setDate(new Date().toISOString().slice(0, 10));
+      setNotes(defaultNote || "");
+
+      // 🔥 Usa initialDate se vier do calendário
+      const dt = initialDate || new Date().toISOString().slice(0, 10);
+      setDate(dt);
+
+      setWords(goalUnit === "Words" ? (defaultWords || "") : "");
+      setMinutes(goalUnit === "Minutes" ? "" : "");
+      setPages(goalUnit === "Pages" ? "" : "");
     }
-  }, [open, defaultWords, defaultNote]);
+  }, [open, defaultWords, defaultNote, goalUnit, initialDate]);
 
   const unitLabel =
-    goalUnit === "Minutes" ? "Minutos" :
-    goalUnit === "Pages"   ? "Páginas" : "Palavras";
+    goalUnit === "Minutes"
+      ? "Minutos"
+      : goalUnit === "Pages"
+      ? "Páginas"
+      : "Palavras";
 
-  // valida: pelo menos 1 campo (>0) conforme a unidade
+  /* ---------------- Validação ---------------- */
   const valid = useMemo(() => {
-    const nW = Number(words)   || 0;
-    const nM = Number(minutes) || 0;
-    const nP = Number(pages)   || 0;
+    const w = Number(words) || 0;
+    const m = Number(minutes) || 0;
+    const p = Number(pages) || 0;
+
     if (!projectId || !date) return false;
-    if (goalUnit === "Minutes") return nM > 0;
-    if (goalUnit === "Pages")   return nP > 0;
-    return nW > 0; // Words (default)
+
+    if (goalUnit === "Minutes") return m > 0;
+    if (goalUnit === "Pages") return p > 0;
+    return w > 0;
   }, [projectId, date, words, minutes, pages, goalUnit]);
 
+  /* ---------------- Salvar ---------------- */
   const save = async () => {
     if (!valid) return;
-    setBusy(true); setErr(""); setMsg("");
+
+    setBusy(true);
+    setErr("");
+    setMsg("");
 
     try {
       const payload = {
         projectId,
-        date, // YYYY-MM-DD
+        date,
         notes: notes?.trim() || undefined,
-        wordsWritten: goalUnit === "Words"   ? Number(words)   : undefined,
-        minutes:      goalUnit === "Minutes" ? Number(minutes) : undefined,
-        pages:        goalUnit === "Pages"   ? Number(pages)   : undefined,
+        wordsWritten: goalUnit === "Words" ? Number(words) : undefined,
+        minutes: goalUnit === "Minutes" ? Number(minutes) : undefined,
+        pages: goalUnit === "Pages" ? Number(pages) : undefined,
       };
 
-      await axios.post(`/api/projects/${projectId}/progress`, payload);
+      await api.post(`/projects/${projectId}/progress`, payload);
 
-      setMsg("Progresso lançado com sucesso.");
-      onSaved?.();
+      onSaved?.(); // recarregar
+      onClose?.(); // 🔥 fecha o modal automaticamente
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Falha ao lançar o progresso.");
+      setErr(
+        e?.response?.data?.message ||
+          e?.message ||
+          "Falha ao lançar o progresso."
+      );
     } finally {
       setBusy(false);
     }
@@ -97,24 +114,30 @@ export default function ProgressModal({
 
   if (!open) return null;
 
+  /* ---------------- Render ---------------- */
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={busy ? undefined : onClose} />
 
-      {/* modal */}
+      {/* fundo */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={busy ? undefined : onClose}
+      />
+
       <div className="relative z-10 w-full max-w-lg rounded-xl bg-white dark:bg-neutral-900 shadow-xl p-5">
         <div className="flex items-start justify-between">
           <h3 className="text-lg font-semibold">Adicionar progresso</h3>
-          <button className="button" onClick={onClose} disabled={busy}>Fechar</button>
+          <button className="button" onClick={onClose} disabled={busy}>
+            Fechar
+          </button>
         </div>
 
-        {/* mensagens */}
         {err && <Alert type="error">{err}</Alert>}
         {msg && <Alert type="success">{msg}</Alert>}
 
-        {/* form */}
         <div className="grid md:grid-cols-2 gap-3 mt-3">
+
+          {/* Data */}
           <label className="flex flex-col gap-1">
             <span className="label">Data</span>
             <input
@@ -122,22 +145,20 @@ export default function ProgressModal({
               className="input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              max={new Date().toISOString().slice(0,10)}
+              max={new Date().toISOString().slice(0, 10)}
             />
           </label>
 
-          {/* Campo condicional por unidade */}
+          {/* Campo condicional */}
           {goalUnit === "Minutes" ? (
             <label className="flex flex-col gap-1">
               <span className="label">Minutos</span>
               <input
                 type="number"
-                min={1}
-                step={1}
                 className="input"
+                min={1}
                 value={minutes}
                 onChange={(e) => setMinutes(e.target.value)}
-                placeholder="ex: 45"
               />
             </label>
           ) : goalUnit === "Pages" ? (
@@ -145,12 +166,10 @@ export default function ProgressModal({
               <span className="label">Páginas</span>
               <input
                 type="number"
-                min={1}
-                step={1}
                 className="input"
+                min={1}
                 value={pages}
                 onChange={(e) => setPages(e.target.value)}
-                placeholder="ex: 5"
               />
             </label>
           ) : (
@@ -158,20 +177,22 @@ export default function ProgressModal({
               <span className="label">Palavras adicionadas</span>
               <input
                 type="number"
-                min={1}
-                step={1}
                 className="input"
+                min={1}
                 value={words}
                 onChange={(e) => setWords(e.target.value)}
-                placeholder="ex: 500"
               />
             </label>
           )}
 
-          {/* Fonte (mantido para UX) */}
+          {/* Fonte */}
           <label className="flex flex-col gap-1">
             <span className="label">Fonte</span>
-            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+            <select
+              className="input"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+            >
               <option value="manual">Manual</option>
               <option value="sprint">Sprint</option>
               <option value="import">Importação</option>
@@ -179,22 +200,28 @@ export default function ProgressModal({
             </select>
           </label>
 
+          {/* Notas */}
           <label className="flex flex-col gap-1 md:col-span-2">
             <span className="label">Notas (opcional)</span>
             <textarea
               className="input"
-              rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              rows={3}
               placeholder={`Observações sobre este lançamento de ${unitLabel.toLowerCase()}…`}
             />
           </label>
         </div>
 
-        {/* ações */}
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button className="button" onClick={onClose} disabled={busy}>Cancelar</button>
-          <button className="btn-primary" onClick={save} disabled={!valid || busy}>
+          <button className="button" onClick={onClose} disabled={busy}>
+            Cancelar
+          </button>
+          <button
+            className="btn-primary"
+            onClick={save}
+            disabled={!valid || busy}
+          >
             {busy ? "Salvando…" : "Salvar"}
           </button>
         </div>

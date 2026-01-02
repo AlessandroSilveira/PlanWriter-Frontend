@@ -1,39 +1,34 @@
-// src/api/http.js (ou http.jsx)
+// src/api/http.js
 import axios from "axios";
 
+// 1) Base URL
+// - Se você usar proxy do Vite (vite.config.js), deixe VITE_API_URL em branco e use caminhos relativos.
+// - Se preferir chamar a API diretamente, defina VITE_API_URL="http://localhost:5000/api" no .env.
+const baseURL =
+  import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "/api";
+
 const api = axios.create({
-  // use o proxy do Vite com "/api" em dev, ou VITE_API_URL p/ apontar direto
-  baseURL: import.meta?.env?.VITE_API_URL || "/api",
-  // withCredentials: true, // se sua autenticação usar COOKIE em vez de Bearer
+  baseURL,
+  withCredentials: false,
 });
 
-// Injeta Authorization: Bearer <token> se existir no localStorage
+// 2) Interceptor p/ Authorization: Bearer <token>
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  config.headers = config.headers || {};
+  try {
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("jwt") ||
+      null;
 
-  // Útil p/ ASP.NET diferenciar requisições AJAX e responder JSON
-  config.headers["X-Requested-With"] = "XMLHttpRequest";
-
-  if (token && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // ignore
   }
   return config;
 });
-
-// Log básico de erros de API
-api.interceptors.response.use(
-  (r) => r,
-  (e) => {
-    const status = e?.response?.status;
-    const data = e?.response?.data;
-    console.error("API error:", status, data || e.message);
-    // opcional: se 401, limpar token
-    if (status === 401) {
-      localStorage.removeItem("token");
-    }
-    return Promise.reject(e);
-  }
-);
 
 export default api;

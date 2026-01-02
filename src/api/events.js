@@ -1,59 +1,89 @@
 // src/api/events.js
-import axios from "axios";
+import api from "./http";
 
-const api = axios.create({
-  baseURL: "/api",
-});
-
-// Lista eventos ativos
+/**
+ * Eventos ativos (NaNo-like)
+ */
 export async function getActiveEvents() {
   const { data } = await api.get("/events/active");
-  return data; // EventDto[]
+  return data;
 }
 
-// (novo) Detalhe por id
-export async function getEventById(eventId) {
-  const { data } = await api.get(`/events/${eventId}`);
-  return data; // EventDto
+/**
+ * Detalhe de um evento
+ */
+export async function getEventById(id) {
+  const { data } = await api.get(`/events/${id}`);
+  return data;
 }
 
-// Progresso do projeto dentro do evento (rota com 2 path params)
-export async function getEventProgress(eventId, projectId) {
-  const { data } = await api.get(`/events/${eventId}/projects/${projectId}/progress`);
-  return data; // EventProgressDto
-}
-
-// Inscrever ou atualizar meta (upsert no back)
-export async function joinEvent({ eventId, projectId, targetWords }) {
-  await api.post("/events/join", { eventId, projectId, targetWords });
-}
-
-// Atualizar meta (mesma rota de join — upsert)
-export async function updateEventTarget({ eventId, projectId, targetWords }) {
-  await api.post("/events/join", { eventId, projectId, targetWords });
-}
-
-// (novo) Sair do evento
-export async function leaveEvent(eventId, projectId) {
-  await api.delete(`/events/${eventId}/projects/${projectId}`);
-}
-
-// Leaderboard
-export async function getEventLeaderboard(eventId, scope = "total", top = 50) {
-  const { data } = await api.get(`/events/${eventId}/leaderboard`, {
-    params: { scope, top },
-  });
-  return data; // EventLeaderboardRowDto[]
-}
-
-// Validação (preview + validate) — usa seu controlador de validação existente
-export async function previewValidation(eventId, projectId) {
+/**
+ * Preview de validação
+ */
+export async function getValidatePreview(eventId, projectId) {
   const { data } = await api.get(`/events/${eventId}/validate/preview`, {
     params: { projectId },
   });
-  return data; // { target, total }
+  return data;
 }
 
-export async function validateWinner(eventId, { projectId, words, source = "manual" }) {
-  await api.post(`/events/${eventId}/validate`, { projectId, words, source });
+/**
+ * Validação efetiva
+ */
+export async function postValidate(eventId, payload) {
+  const { data } = await api.post(`/events/${eventId}/validate`, payload);
+  return data;
+}
+
+/**
+ * Goodies / perks do evento
+ */
+export async function getWinnerGoodies(eventId) {
+  const { data } = await api.get(`/events/${eventId}/goodies`);
+  return data;
+}
+
+/**
+ * Progresso do evento (para cards de progresso)
+ */
+export async function getEventProgress(eventId) {
+  const { data } = await api.get(`/events/${eventId}/progress`);
+  return data;
+}
+
+/**
+ * Leaderboard do evento
+ */
+export async function getEventLeaderboard(eventId) {
+  const { data } = await api.get(`/events/${eventId}/leaderboard`);
+  return data;
+}
+
+/**
+ * Entrar/participar de um evento
+ * POST /events/{id}/join
+ */
+export async function joinEvent(eventId, payload = {}) {
+  const { data } = await api.post(`/events/${eventId}/join`, payload);
+  return data;
+}
+
+/**
+ * Sair de um evento (opcional)
+ */
+export async function leaveEvent(eventId) {
+  const { data } = await api.post(`/events/${eventId}/leave`);
+  return data;
+}
+
+/**
+ * 🔥 Atualizar a meta/target de um evento
+ * Muitos backends fazem PATCH /events/{id}/target ou POST /events/{id}/target
+ * Aqui vamos de POST por ser mais comum em APIs .NET não-restful.
+ *
+ * payload esperado: { targetWords: number } ou { goal: number }
+ */
+export async function updateEventTarget(eventId, payload) {
+  const { data } = await api.post(`/events/${eventId}/target`, payload);
+  return data;
 }

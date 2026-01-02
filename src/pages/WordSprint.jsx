@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SprintTimer from "../components/SprintTimer.jsx";
+import { saveSprintProgress } from "../api/progress";
+import { getProjects } from "../api/projects";
 
 /* util simples de contagem de palavras */
 function countWords(text) {
@@ -7,7 +9,22 @@ function countWords(text) {
 }
 const fmt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
 
+const HISTORY_KEY = "sprint_history";
+const HISTORY_LIMIT = 50;
+
+function loadHistorySafe() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function WordSprint() {
+  /* =========================
+     STATES
+     ========================= */
   const [minutes, setMinutes] = useState(15);
   const [goal, setGoal] = useState(500);
   const [running, setRunning] = useState(false);
@@ -15,51 +32,157 @@ export default function WordSprint() {
   const [baseline, setBaseline] = useState(0);
   const [finished, setFinished] = useState(false);
 
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+
+  const [timerKey, setTimerKey] = useState(0);
+  const [history, setHistory] = useState(() => loadHistorySafe());
+  const [flash, setFlash] = useState("");
+  const [savedToProject, setSavedToProject] = useState(false);
+
+  const startedByTyping = useRef(false);
+
+  /* =========================
+     DERIVED VALUES
+     ========================= */
   const words = useMemo(() => countWords(text), [text]);
   const written = Math.max(0, words - baseline);
   const pct = Math.min(100, Math.round((written / Math.max(1, goal)) * 100));
 
+  /* =========================
+     TIMER FINISH (VISUAL ONLY)
+     ========================= */
+  const handleFinish = useCallback(() => {
+    setRunning(false);
+    setFinished(true);
+    setFlash("Sprint finalizado!");
+  }, []);
+
+  /* =========================
+     SAVE TO PROJECT (MANUAL)
+     ========================= */
+  const handleSaveToProject = async () => {
+    if (!selectedProjectId) {
+      setFlash("Selecione um projeto para salvar o progresso");
+      return;
+    }
+
+    if (written <= 0) {
+      setFlash("Nenhuma palavra escrita para salvar");
+      return;
+    }
+
+    if (savedToProject) return;
+
+    setSavedToProject(true);
+    setFlash("Salvando progresso no projeto...");
+
+    try {
+      await saveSprintProgress({
+        projectId: selectedProjectId,
+        words: written,
+        minutes,
+        date: new Date().toISOString(),
+      });
+
+      setFlash("Progresso salvo no projeto ✅");
+    } catch (err) {
+      console.error(err);
+      setSavedToProject(false);
+      setFlash("Erro ao salvar progresso 😕");
+    }
+  };
+
+  /* =========================
+     CONTROLS
+     ========================= */
   const startSprint = () => {
     setBaseline(countWords(text));
     setFinished(false);
     setRunning(true);
+    startedByTyping.current = true;
+    setSavedToProject(false);
   };
+
   const pauseSprint = () => setRunning(false);
+
   const resetSprint = () => {
     setRunning(false);
     setFinished(false);
     setBaseline(0);
+    setText("");
+    startedByTyping.current = false;
+    setTimerKey((k) => k + 1);
+    setSavedToProject(false);
   };
 
-  const handleFinish = () => {
-    setRunning(false);
-    setFinished(true);
-  };
+  const handleTyping = (e) => {
+    const value = e.target.value;
+    setText(value);
 
-  // (Opcional) “salvar” localmente um histórico simples
-  const saveResult = () => {
-    try {
-      const entry = {
-        at: new Date().toISOString(),
-        minutes,
-        goal,
-        written,
-      };
-      const key = "sprint_history";
-      const arr = JSON.parse(localStorage.getItem(key) || "[]");
-      arr.unshift(entry);
-      localStorage.setItem(key, JSON.stringify(arr.slice(0, 50)));
-      alert("Sprint salvo localmente!");
-    } catch {
-      // ignore
+    if (!running && !finished && !startedByTyping.current) {
+      setBaseline(countWords(value));
+      startedByTyping.current = true;
+      setRunning(true);
     }
   };
 
+  /* =========================
+     LOCAL HISTORY
+     ========================= */
+  const saveLocalHistory = () => {
+    const entry = {
+      at: new Date().toISOString(),
+      minutes,
+      goal,
+      written,
+    };
+
+    const updated = [entry, ...history].slice(0, HISTORY_LIMIT);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    setHistory(updated);
+    setFlash("Sprint salvo localmente ✅");
+  };
+
+  /* =========================
+     LOAD PROJECTS
+     ========================= */
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const data = await getProjects();
+        setProjects(data);
+      } catch (error) {
+        console.error("Erro ao carregar projetos:", error);
+      }
+    }
+    loadProjects();
+  }, []);
+
+  /* =========================
+     RENDER
+     ========================= */
   return (
     <div className="container py-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Word Sprint</h1>
-      </div>
+      <h1 className="text-xl font-semibold">Word Sprint</h1>
+
+      {/* Projeto */}
+      <label className="flex flex-col gap-1">
+        <span className="label">Projeto</span>
+        <select
+          className="input"
+          value={selectedProjectId}
+          onChange={(e) => setSelectedProjectId(e.target.value)}
+          disabled={running}
+        >
+          <option value="">Selecione um projeto</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/* Configurações */}
       <section className="panel">
@@ -70,9 +193,11 @@ export default function WordSprint() {
               className="input"
               type="number"
               min={1}
-              max={180}
               value={minutes}
-              onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))}
+              disabled={running}
+              onChange={(e) =>
+                setMinutes(Math.max(1, Number(e.target.value) || 1))
+              }
             />
           </label>
 
@@ -84,13 +209,18 @@ export default function WordSprint() {
               min={50}
               step={50}
               value={goal}
-              onChange={(e) => setGoal(Math.max(0, Number(e.target.value) || 0))}
+              disabled={running}
+              onChange={(e) => setGoal(Number(e.target.value) || 0)}
             />
           </label>
 
           <div className="flex items-end gap-2">
             {!running ? (
-              <button className="btn-primary" onClick={startSprint}>
+              <button
+                className="btn-primary"
+                onClick={startSprint}
+                disabled={!selectedProjectId}
+              >
                 Iniciar
               </button>
             ) : (
@@ -104,24 +234,32 @@ export default function WordSprint() {
           </div>
         </div>
 
-        {/* Timer */}
-        <div className="mt-4 flex items-center justify-center">
+        {!selectedProjectId && (
+          <p className="text-sm text-muted mt-1">
+            Selecione um projeto para iniciar o sprint
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-center">
           <SprintTimer
+            key={timerKey}
             minutes={minutes}
             running={running}
-            onFinish={handleFinish}
+            onZero={handleFinish}
           />
         </div>
       </section>
 
-      {/* Editor simples */}
+      {/* Editor */}
       <section className="panel">
-        <div className="grid md:grid-cols-4 gap-3">
+        {/* KPIs */}
+        <div className="grid md:grid-cols-4 gap-3 mb-3">
           <div className="kpi">
             <div className="label">Palavras nessa sessão</div>
             <div className="value">{fmt(written)}</div>
             <div className="hint">baseline: {fmt(baseline)}</div>
           </div>
+
           <div className="kpi">
             <div className="label">Meta</div>
             <div className="value">{fmt(goal)}</div>
@@ -130,81 +268,90 @@ export default function WordSprint() {
         </div>
 
         <textarea
-          className="input mt-3 min-h-[240px]"
+          className="input min-h-[240px]"
           placeholder="Escreva aqui durante o sprint…"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTyping}
         />
 
-        <div className="mt-3 flex items-center gap-2">
-          <button className="button" onClick={() => setText(text.trim())}>Limpar espaços</button>
-          <button className="button" onClick={() => navigator.clipboard?.writeText(text)}>Copiar texto</button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="button" onClick={() => setText(text.trim())}>
+            Limpar espaços
+          </button>
+          <button
+            className="button"
+            onClick={() => navigator.clipboard?.writeText(text)}
+          >
+            Copiar texto
+          </button>
+
           {finished && (
-            <button className="btn-primary" onClick={saveResult}>
-              Salvar resultado local
-            </button>
+            <>
+              <button
+                className="btn-primary"
+                onClick={handleSaveToProject}
+                disabled={savedToProject}
+              >
+                Salvar no projeto
+              </button>
+
+              <button className="button" onClick={saveLocalHistory}>
+                Salvar apenas local
+              </button>
+            </>
           )}
         </div>
 
-        {finished && (
-          <p className="text-green-700 dark:text-green-400 mt-2">
-            Sprint finalizado! Você escreveu <b>{fmt(written)}</b> palavras.
-          </p>
-        )}
+        {flash && <p className="mt-2 text-sm text-green-600">{flash}</p>}
       </section>
 
-      {/* Histórico local (opcional) */}
+      {/* Histórico */}
       <section className="panel">
         <h2 className="section-title">Histórico local</h2>
-        <HistoryList />
+        <HistoryList items={history} setItems={setHistory} />
       </section>
     </div>
   );
 }
 
-/* Histórico salvo no localStorage – só para dev/uso offline */
-function HistoryList() {
-  const [items, setItems] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("sprint_history") || "[]");
-    } catch {
-      return [];
-    }
-  });
+/* =========================
+   HISTÓRICO
+   ========================= */
+function HistoryList({ items, setItems }) {
   const clear = () => {
-    localStorage.removeItem("sprint_history");
+    localStorage.removeItem(HISTORY_KEY);
     setItems([]);
   };
 
-  if (!items.length) return <p className="text-sm text-muted">Sem sprints salvos localmente.</p>;
+  if (!items.length)
+    return <p className="text-sm text-muted">Sem sprints salvos localmente.</p>;
 
   return (
     <>
-      <div className="overflow-x-auto mt-2">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted border-b">
-              <th className="py-2 pr-2">Quando</th>
-              <th className="py-2 pr-2">Duração</th>
-              <th className="py-2 pr-2">Meta</th>
-              <th className="py-2 pr-2">Produção</th>
+      <table className="w-full text-sm mt-2">
+        <thead>
+          <tr className="border-b">
+            <th>Quando</th>
+            <th>Duração</th>
+            <th>Meta</th>
+            <th>Produção</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it, i) => (
+            <tr key={i} className="border-b">
+              <td>{new Date(it.at).toLocaleString("pt-BR")}</td>
+              <td>{it.minutes} min</td>
+              <td>{fmt(it.goal)}</td>
+              <td>{fmt(it.written)}</td>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((it, i) => (
-              <tr key={i} className="border-b last:border-0">
-                <td className="py-2 pr-2">
-                  {new Date(it.at).toLocaleString("pt-BR")}
-                </td>
-                <td className="py-2 pr-2">{it.minutes} min</td>
-                <td className="py-2 pr-2">{fmt(it.goal)}</td>
-                <td className="py-2 pr-2">{fmt(it.written)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button className="button mt-3" onClick={clear}>Limpar histórico</button>
+          ))}
+        </tbody>
+      </table>
+
+      <button className="button mt-3" onClick={clear}>
+        Limpar histórico
+      </button>
     </>
   );
 }

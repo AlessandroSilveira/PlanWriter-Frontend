@@ -1,583 +1,379 @@
 // src/pages/Events.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
-
+import { useEffect, useState } from "react";
 import {
   getActiveEvents,
-  getEventById,
+  getEventLeaderboard,
   getEventProgress,
-  joinEvent as apiJoinEvent,
-  updateEventTarget as apiUpdateTarget,
-  leaveEvent as apiLeaveEvent,
+  joinEvent,
+  leaveEvent,
+  updateEventTarget,
 } from "../api/events";
 
-import { getProjects } from "../api/projects";
-import EventLeaderboard from "../components/EventLeaderboard.jsx";
-import ProgressModal from "../components/ProgressModal.jsx";
-import EmptyState from "../components/EmptyState.jsx";
-import Skeleton from "../components/Skeleton.jsx"; // default import
-import { downloadCSV } from "../utils/csv";
-import Alert from "../components/Alert.jsx";
-
-/* Utils */
-function useQuery() {
-  const { search } = useLocation();
-  return new URLSearchParams(search);
-}
-const fmt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
-const fmtDateBR = (d) => {
-  try { return new Date(d).toLocaleDateString("pt-BR"); } catch { return String(d ?? ""); }
-};
-
-/* Página */
 export default function Events() {
-  const q = useQuery();
-  const navigate = useNavigate();
-
-  const qEventId = q.get("eventId") || "";
-  const qProjectId = q.get("projectId") || "";
-
   const [events, setEvents] = useState([]);
-  const [event, setEvent] = useState(null);
-  const [eventId, setEventId] = useState(qEventId);
-
-  const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState(qProjectId);
-
-  const [progress, setProgress] = useState(null);
-  const [target, setTarget] = useState(50000);
-
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [msg, setMsg] = useState("");
 
-  const [openAddProgress, setOpenAddProgress] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    setErr("");
-    setMsg("");
-    try {
-      const list = await getActiveEvents();
-      const arr = Array.isArray(list) ? list : [];
-      setEvents(arr);
-      let id = qEventId;
-      if (!id && arr.length) id = arr[0].id ?? arr[0].Id ?? "";
-      setEventId(id || "");
-    } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Falha ao carregar eventos ativos.");
-    } finally {
-      setLoading(false);
-    }
-  }, [qEventId]);
+  // join
+  const [joinProjectId, setJoinProjectId] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinMsg, setJoinMsg] = useState("");
 
+  // leaderboard + progress
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [progress, setProgress] = useState(null);
+
+  // alterar meta
+  const [newTarget, setNewTarget] = useState("");
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetMsg, setTargetMsg] = useState("");
+
+  // 1) carregar eventos
   useEffect(() => {
-    let alive = true;
+    let mounted = true;
     (async () => {
-      await fetchEvents();
-      if (!alive) return;
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [fetchEvents]);
-
-  useEffect(() => {
-    let alive = true;
-    if (!eventId) {
-      setEvent(null);
-      return;
-    }
-    (async () => {
+      setLoading(true);
+      setErr("");
       try {
-        const ev = await getEventById(eventId);
-        if (!alive) return;
-        setEvent(ev || null);
-      } catch (e) {
-        if (!alive) return;
-        setErr(e?.response?.data?.message || e?.message || "Falha ao carregar o evento.");
-        setEvent(null);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [eventId]);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const list = await getProjects();
-        const arr = Array.isArray(list) ? list : [];
-        if (!alive) return;
-        setProjects(arr);
-        if (!qProjectId && arr[0]) {
-          setProjectId(arr[0].id ?? arr[0].projectId ?? "");
+        const data = await getActiveEvents();
+        if (!mounted) return;
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+          ? data.items
+          : [];
+        setEvents(list);
+        if (list.length > 0) {
+          setSelectedEvent(list[0]);
         }
       } catch (e) {
-        if (!alive) return;
-        setErr((prev) => prev || e?.response?.data?.message || e?.message || "Falha ao carregar projetos.");
+        if (!mounted) return;
+        setErr("Não foi possível carregar os eventos.");
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
     return () => {
-      alive = false;
+      mounted = false;
     };
-  }, [qProjectId]);
+  }, []);
 
-  const loadProgress = async (eid, pid) => {
-    if (!eid || !pid) {
+  // 2) sempre que trocar de evento, carregar leaderboard e progresso
+  useEffect(() => {
+    if (!selectedEvent?.id) {
+      setLeaderboard([]);
       setProgress(null);
       return;
     }
-    try {
-      const p = await getEventProgress({ eventId: eid, projectId: pid });
-      setProgress(p || null);
-      const tgt =
-        Number(p?.targetWords ?? p?.TargetWords) ||
-        Number(event?.defaultTargetWords ?? event?.DefaultTargetWords) ||
-        50000;
-      setTarget(tgt);
-    } catch {
-      setProgress(null);
-      const fallback =
-        Number(event?.defaultTargetWords ?? event?.DefaultTargetWords) || 50000;
-      setTarget(fallback);
-    }
+
+    let mounted = true;
+    (async () => {
+      try {
+        const [lb, prog] = await Promise.all([
+          getEventLeaderboard(selectedEvent.id).catch(() => []),
+          getEventProgress(selectedEvent.id).catch(() => null),
+        ]);
+
+        if (!mounted) return;
+
+        const lbList = Array.isArray(lb?.items) ? lb.items : Array.isArray(lb) ? lb : [];
+        setLeaderboard(lbList);
+        setProgress(prog);
+      } catch {
+        if (!mounted) return;
+        setLeaderboard([]);
+        setProgress(null);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedEvent]);
+
+  const handleSelectEvent = (ev) => {
+    setSelectedEvent(ev);
+    setJoinMsg("");
+    setTargetMsg("");
+    setNewTarget("");
   };
 
-  useEffect(() => {
-    loadProgress(eventId, projectId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, projectId]);
-
-  const evName = event?.name ?? event?.Name ?? "Evento";
-  const evStart = event?.startsAtUtc ?? event?.startsAt ?? event?.StartsAtUtc;
-  const evEnd = event?.endsAtUtc ?? event?.endsAt ?? event?.EndsAtUtc;
-  const evDefaultTarget =
-    Number(event?.defaultTargetWords ?? event?.DefaultTargetWords ?? 0) || 0;
-
-  const joined = !!(progress?.joined ?? progress?.isJoined ?? progress?.targetWords);
-  const won = !!(progress?.won ?? progress?.Won);
-  const total = Number(progress?.totalWritten ?? progress?.TotalWritten ?? 0) || 0;
-  const targetWords = Number(progress?.targetWords ?? progress?.TargetWords ?? target) || 0;
-  const percent = Math.min(100, Math.max(0, targetWords ? (total / targetWords) * 100 : 0));
-  const dailyTarget = useMemo(() => {
-    const t = targetWords || evDefaultTarget || 0;
-    return t ? Math.ceil(t / 30) : 0;
-  }, [targetWords, evDefaultTarget]);
-
-  const selectedProject = useMemo(
-    () => projects.find((p) => (p.id ?? p.projectId) === projectId),
-    [projects, projectId]
-  );
-
-  const joinEvent = async () => {
-    if (!eventId || !projectId || !Number(target)) return;
-    setBusy(true);
-    setErr("");
-    setMsg("");
+  const handleJoin = async () => {
+    if (!selectedEvent?.id) return;
+    setJoinLoading(true);
+    setJoinMsg("");
     try {
-      if (typeof apiJoinEvent === "function") {
-        await apiJoinEvent(eventId, { projectId, targetWords: Number(target) });
-      } else {
-        await axios.post(`/api/events/${eventId}/join`, {
-          projectId,
-          targetWords: Number(target),
-        });
-      }
-      await loadProgress(eventId, projectId);
-      setMsg("Projeto inscrito no evento.");
+      const payload = {};
+      if (joinProjectId) payload.projectId = joinProjectId;
+      await joinEvent(selectedEvent.id, payload);
+      setJoinMsg("Você entrou no evento!");
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Não foi possível inscrever o projeto.");
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Não foi possível entrar no evento.";
+      setJoinMsg(msg);
     } finally {
-      setBusy(false);
+      setJoinLoading(false);
     }
   };
 
-  const updateTarget = async () => {
-    if (!eventId || !projectId || !Number(target)) return;
-    setBusy(true);
-    setErr("");
-    setMsg("");
+  const handleLeave = async () => {
+    if (!selectedEvent?.id) return;
+    setJoinLoading(true);
+    setJoinMsg("");
     try {
-      if (typeof apiUpdateTarget === "function") {
-        await apiUpdateTarget(eventId, { projectId, targetWords: Number(target) });
-      } else {
-        await axios.put(`/api/events/${eventId}/target`, {
-          projectId,
-          targetWords: Number(target),
-        });
-      }
-      await loadProgress(eventId, projectId);
-      setMsg("Meta atualizada.");
+      await leaveEvent(selectedEvent.id);
+      setJoinMsg("Você saiu do evento.");
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Não foi possível atualizar a meta.");
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Não foi possível sair do evento.";
+      setJoinMsg(msg);
     } finally {
-      setBusy(false);
+      setJoinLoading(false);
     }
   };
 
-  const leaveEvent = async () => {
-    if (!eventId || !projectId) return;
-    if (!confirm("Tem certeza que deseja sair deste evento?")) return;
-    setBusy(true);
-    setErr("");
-    setMsg("");
-    try {
-      if (typeof apiLeaveEvent === "function") {
-        await apiLeaveEvent(eventId, { projectId });
-      } else {
-        try {
-          await axios.delete(`/api/events/${eventId}/participants/${projectId}`);
-        } catch {
-          await axios.post(`/api/events/${eventId}/leave`, { projectId });
-        }
-      }
-      await loadProgress(eventId, projectId);
-      setMsg("Você saiu do evento.");
-    } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Não foi possível sair do evento.");
-    } finally {
-      setBusy(false);
+  const handleUpdateTarget = async () => {
+    if (!selectedEvent?.id) return;
+    const val = Number(newTarget);
+    if (!val || val <= 0) {
+      setTargetMsg("Informe uma meta válida (> 0)");
+      return;
     }
-  };
-
-  const exportProgressCsv = useCallback(async () => {
-    if (!eventId || !projectId) return;
-    setBusy(true);
-    setErr("");
-    setMsg("");
+    setTargetLoading(true);
+    setTargetMsg("");
     try {
-      let history = null;
-      const tryGet = async (url, params) => {
-        try {
-          const res = await axios.get(url, { params });
-          if (res?.data) return res.data;
-        } catch {}
-        return null;
-      };
-
-      history = await tryGet(`/api/events/${eventId}/progress/history`, { projectId });
-      if (!history) history = await tryGet(`/api/projects/${projectId}/events/${eventId}/progress`, {});
-      if (!history) history = await tryGet(`/api/projects/${projectId}/progress`, { eventId });
-      if (!history) history = await tryGet(`/api/events/${eventId}/progress`, { projectId });
-
-      const arr = Array.isArray(history) ? history : (history?.items || history?.data || []);
-      if (!Array.isArray(arr) || arr.length === 0) {
-        setMsg("Nenhum lançamento de progresso encontrado para exportar.");
-        setBusy(false);
-        return;
-      }
-
-      const rows = arr.map((it, idx) => {
-        const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.createdAt ?? it.CreatedAt ?? null;
-        const delta =
-          Number(it.wordsAdded ?? it.deltaWords ?? it.WordsAdded ?? it.words ?? it.Words ?? 0) || 0;
-        const totalAcc =
-          Number(it.total ?? it.totalWords ?? it.Total ?? it.TotalWords ?? 0) || undefined;
-        const source = it.source ?? it.Source ?? "";
-        const notes = it.notes ?? it.Notes ?? "";
-        return [fmtDateBR(date) || `#${idx + 1}`, delta, totalAcc ?? "", source, notes];
+      await updateEventTarget(selectedEvent.id, {
+        targetWords: val,
+        goal: val,
       });
-
-      const headers = ["Data", "Palavras adicionadas", "Total acumulado", "Fonte", "Notas"];
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const filename = `progress_event-${eventId}_project-${projectId}_${dateStr}.csv`;
-      downloadCSV(filename, headers, rows);
-      setMsg("Exportado com sucesso.");
+      // atualiza no estado local
+      setSelectedEvent((ev) =>
+        ev ? { ...ev, goal: val, targetWords: val } : ev
+      );
+      setTargetMsg("Meta do evento atualizada.");
     } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Falha ao exportar progresso.");
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Não foi possível atualizar a meta.";
+      setTargetMsg(msg);
     } finally {
-      setBusy(false);
+      setTargetLoading(false);
     }
-  }, [eventId, projectId]);
-
-  if (loading) {
-    return (
-      <div className="container py-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-9 w-24" />
-        </div>
-
-        <section className="panel">
-          <div className="grid md:grid-cols-3 gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="label">Evento</span>
-              <Skeleton className="h-10 w-full" />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label">Projeto</span>
-              <Skeleton className="h-10 w-full" />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label">Meta de palavras</span>
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-3 w-40 mt-1" />
-            </label>
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="grid md:grid-cols-4 gap-3">
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-          </div>
-          <div className="mt-3">
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-48 mt-2" />
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Skeleton className="h-9 w-36" />
-            <Skeleton className="h-9 w-40" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-        </section>
-
-        <section className="panel">
-          <Skeleton className="h-6 w-64" />
-          <div className="mt-3 space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-3/4" />
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  if (!err && projects.length === 0) {
-    return (
-      <div className="container py-6">
-        <EmptyState
-          icon="alert"
-          title="Você ainda não tem projetos"
-          subtitle="Crie um projeto para poder participar dos eventos e registrar seu progresso."
-          actions={[{ label: "Criar projeto", to: "/projects/new" }]}
-        />
-      </div>
-    );
-  }
-
-  if (!err && events.length === 0) {
-    return (
-      <div className="container py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Eventos</h1>
-          <button className="button" onClick={() => navigate(-1)}>
-            Voltar
-          </button>
-        </div>
-
-        <EmptyState
-          icon="calendar"
-          title="Nenhum evento ativo no momento"
-          subtitle="Fique de olho: novas campanhas sazonais aparecem aqui. Você pode continuar escrevendo nos seus projetos normalmente."
-          actions={[{ label: "Atualizar", onClick: fetchEvents }]}
-        />
-      </div>
-    );
-  }
-
-  if (err && events.length === 0) {
-    return (
-      <div className="container py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Eventos</h1>
-          <button className="button" onClick={() => navigate(-1)}>
-            Voltar
-          </button>
-        </div>
-
-        <EmptyState
-          icon="alert"
-          title="Não foi possível carregar os eventos"
-          subtitle={String(err)}
-          actions={[{ label: "Tentar novamente", onClick: fetchEvents }]}
-        />
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="container py-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Eventos</h1>
-        <button className="button" onClick={() => navigate(-1)}>
-          Voltar
-        </button>
-      </div>
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-semibold">Eventos</h1>
 
-      <section className="panel">
-        <div className="grid md:grid-cols-3 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="label">Evento</span>
-            <select
-              className="input"
-              value={eventId}
-              onChange={(e) => setEventId(e.target.value)}
-            >
-              {!events.length && eventId && <option value={eventId}>Evento</option>}
-              {!events.length && !eventId && <option>Nenhum evento ativo</option>}
-              {events.map((ev) => {
-                const id = ev.id ?? ev.Id;
-                const name = ev.name ?? ev.Name ?? "Evento";
-                return (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
+      {loading && <p>Carregando…</p>}
+      {err && <p className="text-red-600">{err}</p>}
 
-          <label className="flex flex-col gap-1">
-            <span className="label">Projeto</span>
-            <select
-              className="input"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-            >
-              {!projects.length && <option>Sem projetos</option>}
-              {projects.map((p) => (
-                <option key={p.id ?? p.projectId} value={p.id ?? p.projectId}>
-                  {p.title ?? p.name ?? "Projeto"}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="label">Meta de palavras</span>
-            <input
-              type="number"
-              min={100}
-              step={100}
-              className="input"
-              value={target}
-              onChange={(e) => setTarget(Math.max(0, Number(e.target.value) || 0))}
-            />
-            {!!evDefaultTarget && (
-              <div className="text-xs text-muted">
-                Padrão do evento: {fmt(evDefaultTarget)} palavras
-              </div>
+      {!loading && !err && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* COLUNA ESQUERDA: lista de eventos */}
+          <div className="space-y-2">
+            {events.length === 0 && (
+              <p className="text-sm text-gray-500">Nenhum evento ativo.</p>
             )}
-          </label>
-        </div>
-
-        {err && <Alert type="error">{err}</Alert>}
-        {msg && <Alert type="success">{msg}</Alert>}
-      </section>
-
-      <section className="panel">
-        <div className="grid md:grid-cols-4 gap-3">
-          <div className="kpi">
-            <div className="label">Evento</div>
-            <div className="value">{evName}</div>
-            <div className="hint">
-              {(evStart ? fmtDateBR(evStart) : "?") + " – " + (evEnd ? fmtDateBR(evEnd) : "?")}
-            </div>
-          </div>
-          <div className="kpi">
-            <div className="label">Projeto</div>
-            <div className="value">{selectedProject?.title ?? selectedProject?.name ?? "—"}</div>
-            <div className="hint">autor: {selectedProject?.ownerName ?? "você"}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Total escrito</div>
-            <div className="value">{fmt(total)}</div>
-            <div className="hint">no evento</div>
-          </div>
-          <div className="kpi">
-            <div className="label">% da meta</div>
-            <div className="value">{Math.round(percent)}%</div>
-            <div className="hint">
-              alvo {fmt(targetWords)} • {dailyTarget ? `${fmt(dailyTarget)}/dia` : "—"}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <div className="progress">
-            <div className="fill" style={{ width: `${Math.round(percent)}%` }} />
-          </div>
-          <div className="text-xs text-muted mt-1">
-            {fmt(total)} / {fmt(targetWords || evDefaultTarget || 0)} palavras
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {!joined ? (
-            <button
-              className="btn-primary"
-              onClick={joinEvent}
-              disabled={busy || !projectId || !eventId || !target}
-            >
-              Inscrever projeto
-            </button>
-          ) : (
-            <>
-              <button className="btn-primary" onClick={updateTarget} disabled={busy || !target}>
-                Salvar meta
-              </button>
-              <button className="button" onClick={() => setOpenAddProgress(true)}>
-                Adicionar progresso
-              </button>
-              <button className="button" onClick={leaveEvent} disabled={busy}>
-                Sair do evento
-              </button>
+            {events.map((ev) => (
               <button
-                className="button"
-                onClick={exportProgressCsv}
-                disabled={busy || !projectId || !eventId}
+                key={ev.id}
+                onClick={() => handleSelectEvent(ev)}
+                className={`w-full text-left p-3 rounded border ${
+                  selectedEvent?.id === ev.id
+                    ? "bg-indigo-50 border-indigo-300"
+                    : "bg-white"
+                }`}
               >
-                Exportar progresso (CSV)
+                <p className="font-medium">
+                  {ev.name || ev.title || `Evento ${ev.id}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Meta: {ev.goal ?? ev.targetWords ?? "—"} palavras
+                </p>
+                <p className="text-xs text-gray-400">
+                  {ev.startDate?.slice(0, 10) || "—"} →{" "}
+                  {ev.endDate?.slice(0, 10) || "—"}
+                </p>
               </button>
+            ))}
+          </div>
 
-              {percent >= 100 && !won && (
-                <button
-                  className="btn-primary"
-                  onClick={() => navigate(`/validate?projectId=${projectId}&eventId=${eventId}`)}
-                >
-                  Validar e virar Winner 🎉
-                </button>
-              )}
-              {won && (
-                <>
-                  <span className="text-green-700 dark:text-green-400">🏆 Winner</span>
-                  <button
-                    className="button"
-                    onClick={() => navigate(`/certificate?projectId=${projectId}&eventId=${eventId}`)}
-                  >
-                    Ver Certificado
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+          {/* COLUNA DIREITA (2 colunas): detalhe, join, progresso, leaderboard */}
+          <div className="md:col-span-2 space-y-4">
+            {selectedEvent ? (
+              <>
+                {/* Detalhe do evento */}
+                <div className="border rounded p-4 bg-white/70">
+                  <h2 className="text-lg font-semibold mb-1">
+                    {selectedEvent.name || selectedEvent.title}
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-2">
+                    {selectedEvent.description || "Evento de escrita."}
+                  </p>
+                  <p className="text-sm">
+                    Meta:{" "}
+                    <strong>
+                      {selectedEvent.goal ??
+                        selectedEvent.targetWords ??
+                        "—"}{" "}
+                      palavras
+                    </strong>
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Início: {selectedEvent.startDate?.slice(0, 10) || "—"} | Fim:{" "}
+                    {selectedEvent.endDate?.slice(0, 10) || "—"}
+                  </p>
+                </div>
 
-      {eventId && (
-        <div className="mt-4">
-          <EventLeaderboard eventId={eventId} top={20} />
+                {/* Entrar / sair */}
+                <div className="border rounded p-4 bg-white/70 space-y-2">
+                  <p className="text-sm mb-1">
+                    Participar usando um projeto (opcional):
+                  </p>
+                  <input
+                    className="border rounded p-2 w-full"
+                    placeholder="projectId (ex.: 123)"
+                    value={joinProjectId}
+                    onChange={(e) => setJoinProjectId(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleJoin}
+                      disabled={joinLoading}
+                      className="px-4 py-2 border rounded"
+                    >
+                      {joinLoading ? "Entrando..." : "Entrar no evento"}
+                    </button>
+                    <button
+                      onClick={handleLeave}
+                      disabled={joinLoading}
+                      className="px-4 py-2 border rounded text-red-700"
+                    >
+                      Sair
+                    </button>
+                  </div>
+                  {joinMsg && <p className="text-sm">{joinMsg}</p>}
+                </div>
+
+                {/* Alterar meta do evento */}
+                <div className="border rounded p-4 bg-white/70 space-y-2">
+                  <p className="text-sm font-medium">
+                    Alterar meta do evento (admin)
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      className="border rounded p-2 w-full"
+                      placeholder="nova meta (palavras)"
+                      value={newTarget}
+                      onChange={(e) => setNewTarget(e.target.value)}
+                    />
+                    <button
+                      onClick={handleUpdateTarget}
+                      disabled={targetLoading}
+                      className="px-3 py-2 border rounded"
+                    >
+                      {targetLoading ? "Salvando…" : "Salvar"}
+                    </button>
+                  </div>
+                  {targetMsg && (
+                    <p className="text-sm text-gray-700">{targetMsg}</p>
+                  )}
+                </div>
+
+                {/* Progresso do evento */}
+                <div className="border rounded p-4 bg-white/70 space-y-2">
+                  <h3 className="font-semibold">Seu progresso</h3>
+                  {progress ? (
+                    <>
+                      <p className="text-sm">
+                        {progress.totalWords ?? progress.current ?? 0} /{" "}
+                        {progress.targetWords ?? progress.goal ?? 0} palavras
+                      </p>
+                      <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-3 bg-indigo-500"
+                          style={{
+                            width: `${calcPercent(progress)}%`,
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      Nenhum progresso ainda.
+                    </p>
+                  )}
+                </div>
+
+                {/* Leaderboard */}
+                <div className="border rounded p-4 bg-white/70 space-y-2">
+                  <h3 className="font-semibold">Leaderboard</h3>
+                  {leaderboard.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      Ainda não há ranking.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="text-left p-2">#</th>
+                            <th className="text-left p-2">Usuário</th>
+                            <th className="text-left p-2">Palavras</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leaderboard.map((row, idx) => (
+                            <tr
+                              key={row.id || row.userId || idx}
+                              className="border-b"
+                            >
+                              <td className="p-2">{idx + 1}</td>
+                              <td className="p-2">
+                                {row.userName ||
+                                  row.username ||
+                                  row.displayName ||
+                                  "—"}
+                              </td>
+                              <td className="p-2">
+                                {row.totalWords ??
+                                  row.words ??
+                                  row.wordCount ??
+                                  0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Selecione um evento na lista.
+              </p>
+            )}
+          </div>
         </div>
       )}
-
-      <ProgressModal
-        open={openAddProgress}
-        onClose={() => setOpenAddProgress(false)}
-        projectId={projectId}
-        onSaved={() => {
-          setOpenAddProgress(false);
-          loadProgress(eventId, projectId);
-        }}
-      />
     </div>
   );
+}
+
+function calcPercent(p) {
+  const current = p?.totalWords ?? p?.current ?? 0;
+  const target = p?.targetWords ?? p?.goal ?? 0;
+  if (!target) return 0;
+  return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
 }

@@ -1,191 +1,183 @@
 // src/pages/WritingDiary.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
-import axios from "axios";
-import HistoryFilters from "../components/HistoryFilters.jsx";
-import HistoryTable from "../components/HistoryTable.jsx";
-import Pagination from "../components/Pagination.jsx";
-import EmptyState from "../components/EmptyState.jsx";
-import Skeleton from "../components/Skeleton.jsx"; // default import
-import { downloadCSV } from "../utils/csv";
-import { getProjects } from "../api/projects";
-import { getActiveEvents } from "../api/events";
-import Alert from "../components/Alert.jsx";
-
-// helpers
-const fmtDateBR = (d) => {
-  try { return new Date(d).toLocaleDateString("pt-BR"); } catch { return String(d ?? ""); }
-};
+import { useEffect, useMemo, useState } from "react";
+import api from "../api/http";
 
 export default function WritingDiary() {
-  // data
-  const [projects, setProjects] = useState([]);
-  const [events, setEvents] = useState([]);
-
-  // filters / paging
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     projectId: "",
-    eventId: "",
-    source: "",
-    dateFrom: "",
-    dateTo: "",
-    minWords: "",
-    maxWords: "",
-    sort: "date_desc",
+    from: "",
+    to: "",
+    page: 1,
+    pageSize: 50,
   });
-  const [page, setPage] = useState(1);       // 1-based
-  const [pageSize, setPageSize] = useState(20);
+  const [error, setError] = useState("");
 
-  // loading / error / rows
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [msg, setMsg] = useState("");
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
+  const params = useMemo(() => {
+    const p = {};
+    if (filters.projectId) p.projectId = filters.projectId;
+    if (filters.from) p.from = filters.from;
+    if (filters.to) p.to = filters.to;
+    if (filters.page) p.page = filters.page;
+    if (filters.pageSize) p.pageSize = filters.pageSize;
+    return p;
+  }, [filters]);
 
-  // boot: load projects + events
   useEffect(() => {
-    let alive = true;
-    (async () => {
+    let mounted = true;
+
+    const tryGet = async (url) => {
       try {
-        const [p, e] = await Promise.allSettled([getProjects(), getActiveEvents()]);
-        if (!alive) return;
-        setProjects(Array.isArray(p.value) ? p.value : []);
-        setEvents(Array.isArray(e.value) ? e.value : []);
-      } catch { /* ignore */ }
-    })();
-    return () => { alive = false; };
-  }, []);
+        const res = await api.get(url, { params });
+        if (res?.data) return res.data;
+      } catch {
+        // tenta a próxima rota
+      }
+      return null;
+    };
 
-  // fetcher with fallbacks
-  const fetchHistory = useCallback(async () => {
-    setLoading(true); setErr(""); setMsg("");
-    try {
-      const params = {
-        projectId: filters.projectId || undefined,
-        eventId: filters.eventId || undefined,
-        source: filters.source || undefined,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined,
-        minWords: filters.minWords || undefined,
-        maxWords: filters.maxWords || undefined,
-        sort: filters.sort || undefined,
-        page,
-        pageSize,
-      };
+    (async () => {
+      setLoading(true);
+      setError("");
 
-      const tryGet = async (url) => {
-        try {
-          const res = await axios.get(url, { params });
-          if (res?.data) return res.data;
-        } catch {}
-        return null;
-      };
-
-      // prioridades
+      // Ordem de fallback: /writing/history -> /progress/history -> /projects/:id/progress/history -> /me/progress/history
       let data =
-        await tryGet("/api/writing/history") ||
-        await tryGet("/api/progress/history") ||
-        (filters.projectId ? await tryGet(`/api/projects/${filters.projectId}/progress/history`) : null) ||
-        await tryGet("/api/me/progress/history");
+        (await tryGet("/writing/history")) ||
+        (await tryGet("/progress/history")) ||
+        (filters.projectId
+          ? await tryGet(`/projects/${filters.projectId}/progress/history`)
+          : null) ||
+        (await tryGet("/me/progress/history"));
 
-      const items = Array.isArray(data?.items) ? data.items
-        : Array.isArray(data?.data) ? data.data
-        : Array.isArray(data) ? data
-        : [];
-      const totalCount = Number(data?.total ?? data?.totalCount ?? items.length) || items.length;
+      if (!mounted) return;
 
-      const normalized = items.map((it) => {
-        const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.createdAt ?? it.CreatedAt ?? null;
-        const deltaWords = Number(it.wordsAdded ?? it.deltaWords ?? it.WordsAdded ?? it.words ?? it.Words ?? 0) || 0;
-        const notes = it.notes ?? it.Notes ?? "";
-        const projectTitle = it.projectTitle ?? it.ProjectTitle ?? it.projectName ?? it.ProjectName ?? "";
-        const eventName = it.eventName ?? it.EventName ?? it.eventTitle ?? it.EventTitle ?? "";
-        const source = it.source ?? it.Source ?? "";
-        return { ...it, dateFmt: fmtDateBR(date), deltaWords, notes, projectTitle, eventName, source };
-      });
+      if (!data) {
+        setError("Não foi possível carregar o diário de escrita.");
+        setItems([]);
+      } else {
+        // normaliza para um array [{date, words, projectId, note}]
+        const list = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+        setItems(list);
+      }
 
-      setRows(normalized);
-      setTotal(totalCount);
-    } catch (e) {
-      setErr(e?.response?.data?.message || e?.message || "Falha ao carregar histórico.");
-      setRows([]); setTotal(0);
-    } finally {
       setLoading(false);
-    }
-  }, [filters, page, pageSize]);
+    })();
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    return () => {
+      mounted = false;
+    };
+  }, [params, filters.projectId]);
 
-  const exportCsv = useCallback(() => {
-    const headers = ["Data", "Projeto", "Evento", "Fonte", "Palavras", "Notas"];
-    const data = rows.map((r) => [
-      r.dateFmt || "",
-      r.projectTitle || "",
-      r.eventName || "",
-      r.source || "",
-      r.deltaWords || 0,
-      r.notes || "",
+  const onExportCsv = () => {
+    const header = ["date", "words", "projectId", "note"];
+    const rows = items.map((x) => [
+      x.date ?? "",
+      x.words ?? x.wordCount ?? "",
+      x.projectId ?? "",
+      (x.note ?? "").replace(/\r?\n/g, " "),
     ]);
-    const dateStr = new Date().toISOString().slice(0,10);
-    const filename = `diario_escrita_${dateStr}.csv`;
-    downloadCSV(filename, headers, data);
-    setMsg("Exportado com sucesso.");
-  }, [rows]);
-
-  const hasData = useMemo(() => !loading && !err && rows.length > 0, [loading, err, rows]);
+    const csv = [header.join(","), ...rows.map((r) => r.map(escapeCsv).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "writing-diary.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="container py-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Diário da Escrita</h1>
-        {hasData && (
-          <button className="button" onClick={exportCsv}>Exportar CSV</button>
-        )}
+    <div className="max-w-4xl mx-auto p-4">
+      <h1 className="text-2xl font-semibold mb-4">Writing Diary</h1>
+
+      {/* Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <input
+          className="border rounded p-2"
+          placeholder="Project Id"
+          value={filters.projectId}
+          onChange={(e) => setFilters((f) => ({ ...f, projectId: e.target.value }))}
+        />
+        <input
+          type="date"
+          className="border rounded p-2"
+          value={filters.from}
+          onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+        />
+        <input
+          type="date"
+          className="border rounded p-2"
+          value={filters.to}
+          onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+        />
+        <button
+          className="border rounded p-2"
+          onClick={() => setFilters((f) => ({ ...f, page: 1 }))}>
+          Aplicar
+        </button>
       </div>
 
-      <HistoryFilters
-        projects={projects}
-        events={events}
-        initial={filters}
-        onChange={(f) => {
-          setFilters((prev) => ({ ...prev, ...f, submit: undefined }));
-          if (f.submit) setPage(1);
-        }}
-      />
+      <div className="mb-3">
+        <button className="border rounded px-3 py-2" onClick={onExportCsv}>
+          Exportar CSV
+        </button>
+      </div>
 
-      {err && <Alert type="error">{err}</Alert>}
-      {msg && <Alert type="success">{msg}</Alert>}
+      {loading && <p>Carregando…</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
-      {loading && (
-        <div className="panel">
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
-          </div>
+      {!loading && !error && (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="text-left p-2 border">Date</th>
+                <th className="text-left p-2 border">Words</th>
+                <th className="text-left p-2 border">Project</th>
+                <th className="text-left p-2 border">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 && (
+                <tr>
+                  <td className="p-3 border" colSpan={4}>
+                    Nenhum registro.
+                  </td>
+                </tr>
+              )}
+              {items.map((it, idx) => (
+                <tr key={idx}>
+                  <td className="p-2 border">{formatDate(it.date)}</td>
+                  <td className="p-2 border">{it.words ?? it.wordCount ?? "-"}</td>
+                  <td className="p-2 border">{it.projectId ?? "-"}</td>
+                  <td className="p-2 border">{it.note ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
-      {!loading && !err && rows.length === 0 && (
-        <EmptyState
-          icon="users"
-          title="Nenhum registro encontrado"
-          subtitle="Ajuste os filtros (datas, projeto, fonte) ou adicione progresso para ver aqui."
-        />
-      )}
-
-      {hasData && <div className="panel">
-        <HistoryTable loading={false} rows={rows} />
-        <div className="mt-4">
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-            onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
-          />
-        </div>
-      </div>}
     </div>
   );
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  // aceita "2025-10-24", ISO, etc.
+  try {
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return d;
+    return date.toISOString().slice(0, 10);
+  } catch {
+    return d;
+  }
+}
+
+function escapeCsv(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
 }
