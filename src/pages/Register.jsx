@@ -1,12 +1,10 @@
 // src/pages/Register.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { register, login } from "../api/auth";
-import { useAuth } from "../context/AuthContext";
+import { register } from "../api/auth";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { setToken } = useAuth();
 
   const [form, setForm] = useState({
     firstName: "",
@@ -16,9 +14,11 @@ export default function Register() {
     password: "",
     confirmPassword: "",
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -26,7 +26,8 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setError(""); 
+
 
     if (form.password !== form.confirmPassword) {
       setError("As senhas não coincidem.");
@@ -35,7 +36,7 @@ export default function Register() {
 
     try {
       setLoading(true);
-      // 1️⃣ faz o registro
+
       await register({
         firstName: form.firstName,
         lastName: form.lastName,
@@ -44,25 +45,13 @@ export default function Register() {
         password: form.password,
       });
 
-      // 2️⃣ login automático
-      const loginRes = await login({ email: form.email, password: form.password });
-      const token =
-        loginRes?.token ||
-        loginRes?.accessToken ||
-        loginRes?.jwt ||
-        loginRes?.data?.token ||
-        null;
+      // ✅ Cadastro OK → vai para login
+      setSuccess(true);
+      //navigate("/", { replace: true });
 
-      if (!token) throw new Error("Token não retornado pelo servidor.");
-
-      // 3️⃣ guarda token e redireciona
-      localStorage.setItem("token", token);
-      setToken(token);
-      navigate("/dashboard");
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
-        err?.message ||
         "Falha no cadastro. Verifique os dados e tente novamente.";
       setError(msg);
     } finally {
@@ -90,7 +79,7 @@ export default function Register() {
               <input
                 type="text"
                 name="firstName"
-                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                className="w-full border rounded-lg p-2 text-sm"
                 value={form.firstName}
                 onChange={handleChange}
                 required
@@ -101,7 +90,7 @@ export default function Register() {
               <input
                 type="text"
                 name="lastName"
-                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                className="w-full border rounded-lg p-2 text-sm"
                 value={form.lastName}
                 onChange={handleChange}
                 required
@@ -114,7 +103,7 @@ export default function Register() {
             <input
               type="date"
               name="dateOfBirth"
-              className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              className="w-full border rounded-lg p-2 text-sm"
               value={form.dateOfBirth}
               onChange={handleChange}
               required
@@ -126,7 +115,7 @@ export default function Register() {
             <input
               type="email"
               name="email"
-              className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              className="w-full border rounded-lg p-2 text-sm"
               value={form.email}
               onChange={handleChange}
               required
@@ -140,26 +129,27 @@ export default function Register() {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
-                  className="w-full border rounded-lg p-2 text-sm pr-16 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border rounded-lg p-2 text-sm pr-16"
                   value={form.password}
                   onChange={handleChange}
                   required
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? "Ocultar" : "Mostrar"}
                 </button>
               </div>
             </div>
+
             <div>
               <label className="block text-sm font-medium mb-1">Confirmar senha</label>
               <input
                 type="password"
                 name="confirmPassword"
-                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                className="w-full border rounded-lg p-2 text-sm"
                 value={form.confirmPassword}
                 onChange={handleChange}
                 required
@@ -167,13 +157,17 @@ export default function Register() {
             </div>
           </div>
 
-          {error && <div className="text-sm text-red-600 text-center">{error}</div>}
+          {error && (
+            <div className="text-sm text-red-600 text-center">
+              {error}
+            </div>
+          )}
 
           <div className="flex justify-end mt-4">
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition"
+              className="px-6 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700"
             >
               {loading ? "Criando..." : "Criar conta"}
             </button>
@@ -181,12 +175,39 @@ export default function Register() {
         </form>
 
         <div className="text-center mt-6 text-sm">
-          Já tem conta? {" "}
+          Já tem conta?{" "}
           <Link to="/login" className="text-indigo-600 font-medium hover:underline">
             Entrar
           </Link>
         </div>
       </div>
+      {success && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center">
+      <div className="flex justify-center mb-4">
+        <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-100 text-green-600 text-xl font-bold">
+          ✓
+        </div>
+      </div>
+
+      <h2 className="text-lg font-semibold mb-2">
+        Usuário cadastrado com sucesso
+      </h2>
+
+      <p className="text-sm text-gray-600 mb-6">
+        Faça o login para entrar no dashboard.
+      </p>
+
+      <button
+        onClick={() => navigate("/", { replace: true })}
+        className="px-6 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
+      >
+        Ir para login
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

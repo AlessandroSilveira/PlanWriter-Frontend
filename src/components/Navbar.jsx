@@ -30,10 +30,10 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    logout?.();
-    localStorage.removeItem("token");
-    navigate("/", { replace: true });
-  };
+  logout();
+  navigate("/", { replace: true });
+};
+
 
   const linkClass = ({ isActive }) =>
     `px-4 py-2 rounded-md text-sm font-medium transition ${

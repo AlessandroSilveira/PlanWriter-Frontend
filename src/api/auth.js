@@ -1,9 +1,11 @@
 // src/api/auth.js
 import api from "./http";
 
-export async function login({ email, password }) {
-  const { data } = await api.post("/auth/login", { email, password });
-  return data;
+export async function login(payload) {
+  const response = await api.post("/auth/login", payload);
+
+  // CONTRATO ÚNICO
+  return response.data.accessToken;
 }
 
 // 👇 alias para compatibilidade

@@ -1,12 +1,12 @@
 // src/pages/Login.jsx
 import { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { setToken } = useContext(AuthContext);
+  const { setToken } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

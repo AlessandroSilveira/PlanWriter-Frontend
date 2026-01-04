@@ -1,9 +1,13 @@
 // src/App.jsx
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
+
 import Navbar from "./components/Navbar.jsx";
 import LoginPopover from "./components/LoginPopover.jsx";
+
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+import RequirePasswordChange from "./routes/RequirePasswordChange.jsx";
+import AdminRoute from "./routes/AdminRoute.jsx";
 
 import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -24,6 +28,10 @@ import PublicProfile from "./pages/PublicProfile.jsx";
 import Resources from "./pages/Resources.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import ChangePassword from "./pages/ChangePassword.jsx";
+
+// ADMIN
+import AdminEvents from "./pages/admin/AdminEvents.jsx";
 
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -39,39 +47,65 @@ export default function App() {
       />
 
       <Routes>
+        {/* 🌍 Públicas */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/resources" element={<Resources />} />
+        <Route path="/u/:slug" element={<PublicProfile />} />
 
+        {/* 🔐 Troca obrigatória de senha */}
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePassword />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* 🔒 Área logada (senha já trocada) */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <RequirePasswordChange>
+                <Dashboard />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/projects"
           element={
             <ProtectedRoute>
-              <Projects />
+              <RequirePasswordChange>
+                <Projects />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/projects/new"
           element={
             <ProtectedRoute>
-              <NewProject />
+              <RequirePasswordChange>
+                <NewProject />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/projects/:id"
           element={
             <ProtectedRoute>
-              <ProjectDetails />
+              <RequirePasswordChange>
+                <ProjectDetails />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
@@ -80,23 +114,31 @@ export default function App() {
           path="/write"
           element={
             <ProtectedRoute>
-              <FocusEditor />
+              <RequirePasswordChange>
+                <FocusEditor />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/sprint"
           element={
             <ProtectedRoute>
-              <WordSprint />
+              <RequirePasswordChange>
+                <WordSprint />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/diary"
           element={
             <ProtectedRoute>
-              <WritingDiary />
+              <RequirePasswordChange>
+                <WritingDiary />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
@@ -105,47 +147,64 @@ export default function App() {
           path="/buddies"
           element={
             <ProtectedRoute>
-              <Buddies />
+              <RequirePasswordChange>
+                <Buddies />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/regions"
           element={
             <ProtectedRoute>
-              <RegionsLeaderboard />
+              <RequirePasswordChange>
+                <RegionsLeaderboard />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/events"
           element={
             <ProtectedRoute>
-              <Events />
+              <RequirePasswordChange>
+                <Events />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/validate"
           element={
             <ProtectedRoute>
-              <Validate />
+              <RequirePasswordChange>
+                <Validate />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/winner"
           element={
             <ProtectedRoute>
-              <WinnerGoodies />
+              <RequirePasswordChange>
+                <WinnerGoodies />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/certificate"
           element={
             <ProtectedRoute>
-              <Certificate />
+              <RequirePasswordChange>
+                <Certificate />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
@@ -154,14 +213,26 @@ export default function App() {
           path="/me"
           element={
             <ProtectedRoute>
-              <ProfileMe />
+              <RequirePasswordChange>
+                <ProfileMe />
+              </RequirePasswordChange>
             </ProtectedRoute>
           }
         />
-        <Route path="/u/:slug" element={<PublicProfile />} />
 
-        <Route path="/resources" element={<Resources />} />
-        {/* <Route path="*" element={<NotFound />} /> */}
+        {/* 👑 ADMIN */}
+        <Route
+          path="/admin/events"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <AdminRoute>
+                  <AdminEvents />
+                </AdminRoute>
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
       </Routes>
 
       <LoginPopover

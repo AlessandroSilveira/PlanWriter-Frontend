@@ -1,65 +1,76 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-// Lê token salvo e ignora "null"/"undefined" e JWT expirado
-function getStoredToken() {
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(
+    () => localStorage.getItem("token")
+  );
+
+useEffect(() => {
+  if (!token || typeof token !== "string") {
+    setUser(null);
+    return;
+  }
+
   try {
-    const raw = localStorage.getItem("token");
-    if (!raw || raw === "null" || raw === "undefined") return null;
-    if (raw.startsWith("{") || raw.startsWith("[")) {
-      const obj = JSON.parse(raw);
-      if (typeof obj === "string") return obj;
-      if (obj?.token) return obj.token;
-      return null;
-    }
-    const parts = raw.split(".");
-    if (parts.length === 3) {
-      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-      const payload = JSON.parse(atob(b64));
-      if (payload?.exp && Date.now() / 1000 >= payload.exp) return null;
-    }
-    return raw;
+    const payloadBase64 = token.split(".")[1];
+    const decoded = JSON.parse(atob(payloadBase64));
+
+    setUser({
+      id: decoded.nameid || decoded.sub || null,
+      email: decoded.email || null,
+      isAdmin: decoded.isAdmin === "true",
+      mustChangePassword: decoded.mustChangePassword === "true",
+    });
   } catch {
-    return null;
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("token");
+  }
+}, [token]);
+
+
+  function login(newToken) {
+  localStorage.setItem("token", newToken);
+  setToken(newToken);
+
+  // ✅ Decodifica e seta user imediatamente (evita race condition com ProtectedRoute)
+  try {
+    const payloadBase64 = newToken.split(".")[1];
+    const payloadJson = atob(payloadBase64);
+    const decoded = JSON.parse(payloadJson);
+
+    setUser({
+      id: decoded.nameid || decoded.sub || null,
+      email: decoded.email || null,
+      isAdmin: decoded.isAdmin === "true",
+      mustChangePassword: decoded.mustChangePassword === "true",
+    });
+  } catch (err) {
+    console.error("Token inválido no login()", err);
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("token");
+    throw err;
   }
 }
 
-// 👉 exportamos também o contexto por compatibilidade
-export const AuthContext = createContext({
-  token: null,
-  isAuthenticated: false,
-  setToken: () => {},
-  logout: () => {},
-});
+  function logout() {
+    localStorage.removeItem("token");
+    setToken(null);
+    setUser(null);
+  }
+
+  const isAuthenticated = !!user;
+
+return (
+  <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
+    {children}
+  </AuthContext.Provider>
+);
+
+}
 
 export const useAuth = () => useContext(AuthContext);
-
-export function AuthProvider({ children }) {
-  const [token, setTokenState] = useState(getStoredToken());
-
-  const setToken = (t) => {
-    if (t && t !== "null" && t !== "undefined") {
-      localStorage.setItem("token", t);
-      setTokenState(t);
-    } else {
-      localStorage.removeItem("token");
-      setTokenState(null);
-    }
-  };
-
-  const logout = () => {
-    try { localStorage.removeItem("token"); } catch {}
-    setTokenState(null);
-  };
-
-  useEffect(() => {
-    const cur = getStoredToken();
-    if (cur !== token) setToken(cur);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <AuthContext.Provider value={{ token, isAuthenticated: !!token, setToken, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../api/auth";
+import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPopover({ open, anchorEl, onClose }) {
-  const { setToken } = useAuth();  // ← ESSENCIAL para atualizar contexto global!
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,28 +19,43 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
     setError("");
 
     try {
-      const data = await login({ email, password });
+      // chama API
+      console.log("🔐 handleLogin disparado");
+      const token = await apiLogin({ email, password });
+      console.log("✅ token recebido", token);
 
-      const token =
-        data?.token ||
-        data?.accessToken ||
-        data?.jwt ||
-        data?.data?.token ||
-        null;
+      if (typeof token !== "string") {
+        throw new Error("Token inválido recebido do servidor.");
+      }
 
-      if (!token) throw new Error("Token inválido.");
+      // salva no contexto
+      login(token);
 
-      // Salva local
-      localStorage.setItem("token", token);
-
-      // >>> Atualiza estado global de login
-      setToken(token);
-
-      // Fecha popover
+      // fecha popover
       onClose?.();
 
-      // Redireciona
-      navigate("/dashboard");
+      // decodifica JWT
+      const decoded = JSON.parse(atob(token.split(".")[1]));
+      console.log("📦 decoded", decoded);
+
+
+      const mustChangePassword = decoded.mustChangePassword === "true";
+      const isAdmin = decoded.isAdmin === "true";
+
+      console.log("➡️ redirect decision", {
+  isAdmin,
+  mustChangePassword
+});
+
+      if (isAdmin && mustChangePassword) {
+        navigate("/change-password", { replace: true });
+      }
+       if (isAdmin && !mustChangePassword) {
+        navigate("/admin/events", { replace: true });
+      }
+       if(!isAdmin && !mustChangePassword) {
+        navigate("/dashboard", { replace: true });
+      }
 
     } catch (err) {
       const msg =
@@ -68,35 +83,25 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
   if (rect) {
     left = rect.right - popoverWidth;
     top = rect.bottom + 10;
-
     left = Math.max(8, Math.min(left, window.innerWidth - popoverWidth - 8));
 
     const center = rect.left + rect.width / 2;
-    arrowLeft = center - left;
-    arrowLeft = Math.max(16, Math.min(arrowLeft, popoverWidth - 16));
+    arrowLeft = Math.max(16, Math.min(center - left, popoverWidth - 16));
   } else {
     left = (window.innerWidth - popoverWidth) / 2;
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40"
-      onClick={onClose}
-      style={{ background: "transparent" }}
-    >
+    <div className="fixed inset-0 z-40" onClick={onClose}>
       <div
-        className="absolute z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-80 p-4"
+        className="absolute z-50 bg-white rounded-xl shadow-xl border w-80 p-4"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* seta */}
         <div
-          className="absolute -top-2 w-4 h-4 bg-white border-l border-t border-gray-200 rotate-45"
-          style={{
-            left: arrowLeft - 8,
-            boxShadow: "-1px -1px 1px rgba(0,0,0,0.05)",
-          }}
-        ></div>
+          className="absolute -top-2 w-4 h-4 bg-white border-l border-t rotate-45"
+          style={{ left: arrowLeft - 8 }}
+        />
 
         <h2 className="text-lg font-semibold mb-3">Entrar</h2>
 
@@ -129,7 +134,7 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              className="px-4 py-2 bg-indigo-600 text-white rounded"
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>
