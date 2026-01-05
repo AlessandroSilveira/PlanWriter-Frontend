@@ -163,7 +163,8 @@ export default function WordSprint() {
      RENDER
      ========================= */
   return (
-    <div className="container py-6 space-y-4">
+    <header className="hero">
+    <div className="container hero-inner">
       <h1 className="text-xl font-semibold">Word Sprint</h1>
 
       {/* Projeto */}
@@ -311,6 +312,7 @@ export default function WordSprint() {
         <HistoryList items={history} setItems={setHistory} />
       </section>
     </div>
+    </header>
   );
 }
 

@@ -18,6 +18,7 @@ import WritingDiary from "./pages/WritingDiary.jsx";
 import Buddies from "./pages/Buddies.jsx";
 import RegionsLeaderboard from "./pages/RegionsLeaderboard.jsx";
 import Events from "./pages/Events.jsx";
+import EventDetails from "./pages/EventDetails.jsx";
 import Validate from "./pages/Validate.jsx";
 import WinnerGoodies from "./pages/WinnerGoodies.jsx";
 import Certificate from "./pages/Certificate.jsx";
@@ -32,6 +33,8 @@ import ChangePassword from "./pages/ChangePassword.jsx";
 
 // ADMIN
 import AdminEvents from "./pages/admin/AdminEvents.jsx";
+import AdminEventCreate from "./pages/admin/AdminEventCreate.jsx";
+import EditEvent from "./pages/admin/EditEvent.jsx";
 
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -175,6 +178,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/events/:eventId"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <EventDetails />
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/validate"
@@ -233,6 +246,45 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/events/new"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <AdminRoute>
+                  <AdminEventCreate />
+                </AdminRoute>
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/events"
+          element={
+             <ProtectedRoute>
+              <RequirePasswordChange>
+                <AdminRoute>
+              <AdminEvents />
+            </AdminRoute>
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/events/:id/edit"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <AdminRoute>
+                  <EditEvent />
+                </AdminRoute>
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
+
+
+
       </Routes>
 
       <LoginPopover

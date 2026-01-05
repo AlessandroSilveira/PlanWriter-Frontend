@@ -144,7 +144,7 @@ export default function FocusEditor() {
   }, [projectId, words]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <>
       <header className="hero">
         <div className="container hero-inner">
           <div className="flex items-center justify-between">
@@ -231,10 +231,7 @@ export default function FocusEditor() {
               <div className="hint">{remainingToTarget === 0 ? "meta batida 🎉" : "hoje"}</div>
             </div>
           </div>
-        </div>
-      </header>
-
-      <main className="flex-grow">
+           <main className="flex-grow">
         <div className="container">
           <section className="panel">
             <textarea
@@ -248,6 +245,10 @@ export default function FocusEditor() {
           </section>
         </div>
       </main>
+        </div>
+      </header>
+
+     
 
       {/* Registro no projeto usando o ProgressModal existente */}
       <ProgressModal
@@ -264,6 +265,6 @@ export default function FocusEditor() {
             : `Sessão no Editor de Foco — ${words} palavras`
         }
       />
-    </div>
+    </>
   );
 }

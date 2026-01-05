@@ -64,7 +64,7 @@ export default function Projects() {
   return (
     <header className="hero">
       <div className="container hero-inner">
-      <section className="panel">
+      
         <div className="flex items-center justify-between">
           <h1 className="section-title">Seus projetos</h1>
           <Link to="/projects/new" className="btn-primary">+ Novo projeto</Link>
@@ -101,7 +101,7 @@ export default function Projects() {
             )}
           </div>
         </div>
-      </section>
+      
       </div>
     </header>
 

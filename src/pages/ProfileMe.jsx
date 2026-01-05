@@ -80,7 +80,8 @@ export default function ProfileMe() {
   if (loading) return <div className="container py-6">Carregando…</div>;
 
   return (
-    <div className="container py-6 space-y-4">
+    <header className="hero">
+    <div className="container hero-inner">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Meu Perfil</h1>
         <div className="flex items-center gap-2">
@@ -212,5 +213,6 @@ export default function ProfileMe() {
 
 
     </div>
+    </header>
   );
 }
