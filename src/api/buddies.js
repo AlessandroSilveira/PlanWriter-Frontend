@@ -6,8 +6,8 @@ export async function listBuddies() {
   return data; // [{ userId, username, displayName, avatarUrl }]
 }
 
-export async function followByUsername(username) {
-  await api.post("/buddies/follow/username", { username });
+export async function followByEmail(email) {
+  await api.post("/buddies/follow/username", { email });
 }
 
 export async function followById(followeeId) {

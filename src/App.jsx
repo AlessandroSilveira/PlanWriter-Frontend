@@ -16,7 +16,6 @@ import NewProject from "./pages/NewProject.jsx";
 import ProjectDetails from "./pages/ProjectDetails.jsx";
 import WritingDiary from "./pages/WritingDiary.jsx";
 import Buddies from "./pages/Buddies.jsx";
-import RegionsLeaderboard from "./pages/RegionsLeaderboard.jsx";
 import Events from "./pages/Events.jsx";
 import EventDetails from "./pages/EventDetails.jsx";
 import Validate from "./pages/Validate.jsx";
@@ -157,16 +156,7 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/regions"
-          element={
-            <ProtectedRoute>
-              <RequirePasswordChange>
-                <RegionsLeaderboard />
-              </RequirePasswordChange>
-            </ProtectedRoute>
-          }
-        />
+       
 
         <Route
           path="/events"

@@ -1,87 +1,122 @@
 // src/components/EventProgressCard.jsx
 import { useEffect, useState } from "react";
-import { getEventProgress } from "../api/events";
+import {
+  getMyEvents,
+  getEventProjectProgress,
+} from "../api/events";
 
-export default function EventProgressCard({ eventId, title = "Progresso do Evento" }) {
-  const [progress, setProgress] = useState(null);
+export default function EventProgressCard({ eventId, projectId }) {
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState(null);
 
   useEffect(() => {
-    if (!eventId) {
-      setErr("Nenhum evento selecionado.");
-      setLoading(false);
-      return;
-    }
-
-    let mounted = true;
+    let alive = true;
 
     (async () => {
       setLoading(true);
-      setErr("");
+      setError("");
+      setProgress(null);
+
       try {
-        const data = await getEventProgress(eventId);
-        if (!mounted) return;
+        let resolvedEventId = eventId;
+        let resolvedProjectId = projectId;
+
+        // 🔍 Resolve eventId automaticamente se só veio projectId
+        if (!resolvedEventId && resolvedProjectId) {
+          const myEvents = await getMyEvents();
+          const found = (myEvents || []).find(
+            (e) => e.projectId === resolvedProjectId
+          );
+          if (found) {
+            resolvedEventId = found.eventId;
+          }
+        }
+
+        if (!resolvedEventId || !resolvedProjectId) {
+          if (alive) {
+            setError("Nenhum evento ativo para este projeto.");
+            setLoading(false);
+          }
+          return;
+        }
+
+        // ✅ Endpoint correto
+        const data = await getEventProjectProgress(
+          resolvedEventId,
+          resolvedProjectId
+        );
+
+        if (!alive) return;
+
         setProgress(data);
-      } catch (e) {
-        if (!mounted) return;
-        setErr("Não foi possível carregar o progresso do evento.");
-        setProgress(null);
+      } catch {
+        if (alive) {
+          setError("Não foi possível carregar o progresso do evento.");
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
 
     return () => {
-      mounted = false;
+      alive = false;
     };
-  }, [eventId]);
+  }, [eventId, projectId]);
 
-  const percent = normalizePercent(progress?.percent, progress);
+  /* ===================== RENDER ===================== */
+
+  if (loading) {
+    return (
+      <div className="card">
+        <h3 className="font-semibold mb-2">Progresso do Evento</h3>
+        <p className="text-sm text-muted">Carregando…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card">
+        <h3 className="font-semibold mb-2">Progresso do Evento</h3>
+        <p className="text-sm text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!progress) return null;
+
+  // 🔥 CAMPOS REAIS DO BACKEND
+  const eventName = progress.name ?? "Evento";
+  const current = Number(progress.totalWrittenInEvent ?? 0);
+  const target = Math.max(1, Number(progress.targetWords ?? 1));
+  const percent =
+    progress.percent != null
+      ? Math.min(100, Math.round(progress.percent))
+      : Math.min(100, Math.round((current / target) * 100));
 
   return (
-    <div className="border rounded-lg p-4 bg-white/70 backdrop-blur">
-      <h2 className="text-lg font-semibold mb-3">{title}</h2>
+    <div className="card">
+      <h3 className="font-semibold mb-1">{eventName}</h3>
 
-      {loading && <p>Carregando…</p>}
-      {!loading && err && <p className="text-red-600 text-sm">{err}</p>}
+      <p className="text-sm text-muted mb-2">
+        {current.toLocaleString("pt-BR")} /{" "}
+        {target.toLocaleString("pt-BR")} palavras
+      </p>
 
-      {!loading && !err && progress && (
-        <>
-          <div className="flex items-center justify-between mb-2 text-sm text-gray-600">
-            <span>
-              {progress.totalWords ?? progress.current ?? 0} /{" "}
-              {progress.targetWords ?? progress.goal ?? 0} palavras
-            </span>
-            <span>{percent}%</span>
-          </div>
-          <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
-            <div
-              className="h-3 bg-indigo-500 transition-all"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          {progress.projectId ? (
-            <p className="text-xs text-gray-500">
-              Projeto: {progress.projectName || progress.projectId}
-            </p>
-          ) : null}
-        </>
-      )}
+      <div className="h-2 bg-black/10 rounded overflow-hidden mb-2">
+        <div
+          className="h-full bg-indigo-600"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
 
-      {!loading && !err && !progress && (
-        <p className="text-sm text-gray-500">Sem dados de progresso ainda.</p>
-      )}
+      <div className="flex justify-between text-sm text-muted">
+        <span>{percent}% concluído</span>
+        {progress.daysLeft != null && (
+          <span>{progress.daysLeft} dias restantes</span>
+        )}
+      </div>
     </div>
   );
-}
-
-function normalizePercent(percent, raw) {
-  if (typeof percent === "number" && !Number.isNaN(percent)) {
-    return Math.max(0, Math.min(100, Math.round(percent)));
-  }
-  const current = raw?.totalWords ?? raw?.current ?? 0;
-  const target = raw?.targetWords ?? raw?.goal ?? 0;
-  if (!target || target <= 0) return 0;
-  return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
 }

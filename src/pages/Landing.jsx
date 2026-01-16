@@ -5,104 +5,235 @@ export default function Landing() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="min-h-[calc(100vh-56px)] flex flex-col">
-      {/* HERO */}
-      <header className="hero">
-        <div className="container hero-inner">
-          <h1 className="text-3xl md:text-4xl font-semibold">PlanWriter</h1>
-          <p className="mt-3 max-w-3xl">
-            Foco, consistência e ritmo para seu livro. Defina metas, acompanhe seu progresso com estatísticas claras
-            e desbloqueie conquistas — tudo em uma interface simples e agradável.
-          </p>
-          <div className="mt-4">
-            <button className="btn-primary" onClick={() => setOpen(true)}>Começar agora</button>
+    <>
+      <style>{css}</style>
+
+      <section className="pw-hero">
+        {/* Background */}
+        <div className="pw-hero-bg" />
+        <div className="pw-hero-overlay" />
+
+        {/* Conteúdo */}
+        <div className="pw-hero-inner">
+          {/* HERO */}
+          <div className="pw-hero-main">
+            <span className="pw-brand">PlanWriter</span>
+
+            <h1 className="pw-title">
+              Escreva. Acompanhe. <span>Conclua.</span>
+            </h1>
+
+            <p className="pw-subtitle">
+              O PlanWriter ajuda você a transformar pequenas sessões de escrita
+              em progresso real — com metas claras, estatísticas visuais e constância.
+            </p>
+
+            <button className="pw-btn" onClick={() => setOpen(true)}>
+              Começar a escrever
+            </button>
+
+            <div className="pw-hint">Gratuito para começar</div>
           </div>
-        </div>
-      </header>
 
-      {/* BENEFÍCIOS + DESTAQUES */}
-      <main className="flex-grow">
-        <div className="container grid">
-          <section className="panel">
-            <h2>Por que usar o PlanWriter?</h2>
-            <ul className="list-disc pl-6 space-y-2 mt-3">
-              <li>Defina metas de palavras por projeto (NaNoWriMo-style).</li>
-              <li>Registre sessões e visualize estatísticas diárias, semanais e mensais.</li>
-              <li>Conquistas (badges) para manter a motivação e celebrar marcos.</li>
-              <li>Interface responsiva, leve e agradável para longas jornadas de escrita.</li>
-            </ul>
-            <div className="mt-4">
-              <button className="button" onClick={() => setOpen(true)}>Entrar para começar</button>
+          {/* BENEFÍCIOS */}
+          <div className="pw-benefits">
+            <div>
+              <h3>Metas claras</h3>
+              <p>
+                Defina metas por projeto ou por mês e saiba exatamente
+                onde quer chegar.
+              </p>
             </div>
-          </section>
+            <div>
+              <h3>Progresso visível</h3>
+              <p>
+                Estatísticas, gráficos e histórico para acompanhar
+                sua evolução.
+              </p>
+            </div>
+            <div>
+              <h3>Escrita em foco</h3>
+              <p>
+                Sem feed, sem rede social, sem distrações —
+                apenas escrita.
+              </p>
+            </div>
+          </div>
 
-          <aside className="panel">
-            <h2>Destaques</h2>
-            <div className="mt-3 space-y-2 text-sm text-muted">
-              <p>📈 <strong>Estatísticas detalhadas</strong>: melhor dia, média/dia e sequência de escrita.</p>
-              <p>🧭 <strong>Organização por projetos e gêneros</strong>: cada livro com sua meta.</p>
-              <p>🏅 <strong>Conquistas</strong>: complete metas, ganhe badges e mantenha o ritmo.</p>
-              <p>☁️ <strong>Experiência limpa</strong>: escrita em primeiro lugar, sem distrações.</p>
-            </div>
-          </aside>
-        </div>
-
-        {/* COMO FUNCIONA + PRINTS (placeholder) */}
-        <div className="container grid">
-          <section className="panel">
-            <h2>Como funciona</h2>
-            <ol className="list-decimal pl-6 space-y-2 mt-3">
-              <li>Crie um projeto com sua meta de palavras.</li>
-              <li>Registre suas sessões de escrita — com data, palavras e notas.</li>
-              <li>Acompanhe seu progresso e desbloqueie conquistas.</li>
-            </ol>
-            <div className="mt-4">
-              <button className="btn-primary" onClick={() => setOpen(true)}>Fazer login</button>
-            </div>
-          </section>
-
-          <aside className="panel">
-            <h2>Depoimentos</h2>
-            <div className="mt-3 space-y-3 text-sm">
-              <blockquote>
-                “Finalmente bati minha meta mensal! O gráfico e as badges me mantiveram no ritmo.”
-                <div className="text-muted mt-1">— Ana, autora independente</div>
-              </blockquote>
-              <blockquote>
-                “Perfeito para NaNoWriMo e para escrever o resto do ano. Simples e direto.”
-                <div className="text-muted mt-1">— Rafael, roteirista</div>
-              </blockquote>
-            </div>
-          </aside>
+          <footer className="pw-footer">
+            © {new Date().getFullYear()} PlanWriter
+          </footer>
         </div>
 
-        {/* FAQ */}
-        <div className="container">
-          <section className="panel">
-            <h2>Perguntas frequentes</h2>
-            <div className="mt-3 space-y-3 text-sm">
-              <details>
-                <summary>Preciso criar conta?</summary>
-                <p>Sim, faça login para salvar seus projetos e progresso com segurança.</p>
-              </details>
-              <details>
-                <summary>Posso editar metas depois?</summary>
-                <p>Sim, você pode ajustar metas e prazos a qualquer momento.</p>
-              </details>
-              <details>
-                <summary>Funciona no celular?</summary>
-                <p>Sim, a interface se adapta a telas menores para você registrar de qualquer lugar.</p>
-              </details>
-            </div>
-          </section>
-        </div>
-      </main>
-
-      <footer className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-        © {new Date().getFullYear()} PlanWriter
-      </footer>
+       
+        
+      </section>
 
       <LoginModal open={open} onClose={() => setOpen(false)} />
-    </div>
+    </>
   );
 }
+
+const css = `
+/* ===== BASE ===== */
+:root{
+  --ink:#0f172a;
+  --muted:#475569;
+  --accent:#4f46e5;
+}
+
+*{ box-sizing:border-box; }
+
+/* ===== HERO ===== */
+.pw-hero{
+  position:relative;
+  min-height:140vh;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.pw-hero-bg{
+  position:absolute;
+  inset:0;
+  background-image:url("/assets/landing/hero-writing.png");
+  background-size:cover;
+  background-position:center;
+  z-index:0;
+  filter: saturate(1.50) contrast(1.50);
+}
+
+.pw-hero-overlay{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background: linear-gradient(
+    to bottom,
+    rgba(245,239,230,0),
+    rgba(245,239,230,0.82)
+  );
+}
+
+
+.pw-hero-inner{
+  position:relative;
+  z-index:2;
+  max-width:1100px;
+  width:100%;
+  padding:80px 24px 48px;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:72px;
+}
+
+/* ===== HERO CONTENT ===== */
+.pw-hero-main{
+  max-width:760px;
+  text-align:center;
+}
+
+.pw-brand{
+  font-family:ui-serif,Georgia,serif;
+  font-size:26px;
+  display:block;
+  margin-bottom:12px;
+}
+
+.pw-title{
+  font-family:ui-serif,Georgia,serif;
+  font-size:clamp(44px,6vw,72px);
+  line-height:1.05;
+  margin:0;
+}
+
+.pw-title span{
+  color:var(--accent);
+  font-style:italic;
+}
+
+.pw-subtitle{
+  margin-top:16px;
+  color:var(--muted);
+  font-size:18px;
+}
+
+.pw-btn{
+  margin-top:28px;
+  padding:14px 28px;
+  border:none;
+  border-radius:12px;
+  background:var(--accent);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 14px 36px rgba(79,70,229,.35);
+}
+
+.pw-hint{
+  margin-top:10px;
+  font-size:14px;
+  color:#64748b;
+}
+
+/* ===== BENEFÍCIOS ===== */
+.pw-benefits{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:40px;
+  padding-top:48px;
+  border-top:1px solid rgba(15,23,42,.15);
+  text-align:center;
+}
+
+.pw-benefits h3{
+  font-size:22px;
+  margin-bottom:8px;
+}
+
+.pw-benefits p{
+  color:var(--muted);
+  line-height:1.6;
+}
+
+/* ===== FLOATING CARDS ===== */
+.pw-floating{
+  position:absolute;
+  z-index:3;
+}
+
+.pw-login{
+  right:120px;
+  bottom:200px;
+}
+
+.pw-mini{
+  right:40px;
+  bottom:120px;
+}
+
+.pw-card,
+.pw-mini-card{
+  background:white;
+  border-radius:18px;
+  padding:16px;
+  box-shadow:0 30px 70px rgba(0,0,0,.25);
+}
+
+/* ===== FOOTER ===== */
+.pw-footer{
+  margin-top:24px;
+  font-size:14px;
+  color:var(--muted);
+}
+
+/* ===== RESPONSIVO ===== */
+@media(max-width:900px){
+  .pw-hero{ min-height:120vh; }
+  .pw-benefits{ grid-template-columns:1fr; }
+  .pw-floating{ display:none; }
+}
+`;

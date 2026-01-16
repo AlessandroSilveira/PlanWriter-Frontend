@@ -103,3 +103,10 @@ export const getProjectBadges = async (projectId) => {
 // Aliases (compatibilidade)
 // =====================
 export const getProjectProgress = getProjectHistory;
+
+export async function getMonthlyProgress() {
+  const { data } = await api.get("/projects/monthly");
+  return data; 
+  // { total: number, month: "YYYY-MM" }
+}
+

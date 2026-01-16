@@ -1,0 +1,8 @@
+SELECT TOP (1000) [Id]
+      ,[Name]
+      ,[Description]
+      ,[Icon]
+      ,[AwardedAt]
+      ,[ProjectId]
+      ,[EventId]
+  FROM [PlanWriterDb].[dbo].[Badges]
