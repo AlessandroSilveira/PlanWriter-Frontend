@@ -241,7 +241,7 @@ export default function EventDetails() {
           {myEvent && (
             <button
               onClick={async () => {
-                await leaveEvent(eventId);
+                await leaveEvent(eventId, myEvent.projectId);
                 navigate("/events");
               }}
               className="px-4 py-2 border rounded-lg text-rose-600"

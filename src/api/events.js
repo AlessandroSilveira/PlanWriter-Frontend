@@ -36,19 +36,20 @@ export async function postValidate(eventId, payload) {
 }
 
 /**
- * Goodies / perks do evento
- */
-export async function getWinnerGoodies(eventId) {
-  const { data } = await api.get(`/events/${eventId}/goodies`);
-  return data;
-}
-
-/**
  * Progresso do evento (para cards de progresso)
  */
-export async function getEventProgress(eventId) {
-  const { data } = await api.get(`/events/${eventId}/progress`);
-  return data;
+export async function getEventProgress(eventIdOrParams, projectId) {
+  let eventId = eventIdOrParams;
+  if (eventIdOrParams && typeof eventIdOrParams === "object") {
+    eventId = eventIdOrParams.eventId ?? eventIdOrParams.id;
+    projectId = eventIdOrParams.projectId;
+  }
+
+  if (!eventId || !projectId) {
+    throw new Error("eventId e projectId são obrigatórios.");
+  }
+
+  return getEventProjectProgress(eventId, projectId);
 }
 
 /**
@@ -74,26 +75,22 @@ export async function joinEvent({ eventId, projectId, targetWords }) {
   return data;
 }
 
-/**
- * Sair de um evento (opcional)
- */
-export async function leaveEvent(eventId) {
-  const { data } = await api.post(`/events/${eventId}/leave`);
-  return data;
-}
-
-
-export async function updateEventTarget(eventId, payload) {
-  const { data } = await api.post(`/events/${eventId}/target`, payload);
-  return data;
-}
-
 export const getEventProjectProgress = async (eventId, projectId) => {
   const { data } = await api.get(
     `/events/${eventId}/projects/${projectId}/progress`
   );
   return data;
 };
+
+/**
+ * Sair de um evento
+ */
+export async function leaveEvent(eventId, projectId) {
+  if (!eventId || !projectId) {
+    throw new Error("eventId e projectId são obrigatórios.");
+  }
+  await api.delete(`/events/${eventId}/projects/${projectId}`);
+}
 
 export const getMyEvents = async () => {
   const { data } = await api.get("/events/my");

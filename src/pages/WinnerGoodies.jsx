@@ -66,6 +66,7 @@ export default function WinnerGoodies() {
   const q = useQuery();
   const navigate = useNavigate();
   const projectId = q.get("projectId");
+  const eventId = q.get("eventId");
 
   const [project, setProject] = useState(null);
   const [history, setHistory] = useState([]);
@@ -121,7 +122,10 @@ export default function WinnerGoodies() {
       <div className="container container--wide py-6">
         <section className="panel section-panel">
           <h2 className="section-title">Winner goodies</h2>
-          <p className="meta">Passe um <b>projectId</b> na URL, por ex.: <code>/goodies?projectId=...</code></p>
+          <p className="meta">
+            Passe <b>projectId</b> e <b>eventId</b> na URL, por ex.:{" "}
+            <code>/goodies?projectId=...&amp;eventId=...</code>
+          </p>
         </section>
       </div>
     );
@@ -161,11 +165,17 @@ export default function WinnerGoodies() {
             </p>
             <button
               className="btn-primary w-full"
-              disabled={!won}
-              onClick={() => navigate(`/certificate?projectId=${projectId}`)}
-              title={won ? "Abrir certificado" : "Conclua a meta para liberar"}
+              disabled={!won || !eventId}
+              onClick={() => navigate(`/certificate?projectId=${projectId}&eventId=${eventId}`)}
+              title={
+                !eventId
+                  ? "Informe o eventId para emitir o certificado"
+                  : won
+                  ? "Abrir certificado"
+                  : "Conclua a meta para liberar"
+              }
             >
-              {won ? "Ver certificado" : "Bloqueado até concluir"}
+              {!eventId ? "Informe o evento" : won ? "Ver certificado" : "Bloqueado até concluir"}
             </button>
           </section>
 

@@ -27,28 +27,29 @@ export default function WritingDiary() {
   useEffect(() => {
     let mounted = true;
 
-    const tryGet = async (url) => {
-      try {
-        const res = await api.get(url, { params });
-        if (res?.data) return res.data;
-      } catch {
-        // tenta a próxima rota
-      }
-      return null;
-    };
-
     (async () => {
       setLoading(true);
       setError("");
 
-      // Ordem de fallback: /writing/history -> /progress/history -> /projects/:id/progress/history -> /me/progress/history
-      let data =
-        (await tryGet("/writing/history")) ||
-        (await tryGet("/progress/history")) ||
-        (filters.projectId
-          ? await tryGet(`/projects/${filters.projectId}/progress/history`)
-          : null) ||
-        (await tryGet("/me/progress/history"));
+      if (!filters.projectId) {
+        if (mounted) {
+          setItems([]);
+          setError("Informe um projectId para carregar o diário.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      let data = null;
+      try {
+        const res = await api.get(
+          `/projects/${filters.projectId}/progress/history`,
+          { params }
+        );
+        data = res?.data ?? null;
+      } catch {
+        data = null;
+      }
 
       if (!mounted) return;
 
@@ -58,7 +59,26 @@ export default function WritingDiary() {
       } else {
         // normaliza para um array [{date, words, projectId, note}]
         const list = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-        setItems(list);
+        const from = filters.from ? new Date(filters.from) : null;
+        const to = filters.to ? new Date(filters.to) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+
+        const filtered = list.filter((it) => {
+          if (!from && !to) return true;
+          const raw = it.date ?? it.Date ?? it.createdAt ?? it.CreatedAt;
+          if (!raw) return true;
+          const d = new Date(raw);
+          if (Number.isNaN(d.getTime())) return true;
+          if (from && d < from) return false;
+          if (to && d > to) return false;
+          return true;
+        });
+
+        const page = Math.max(1, Number(filters.page) || 1);
+        const pageSize = Math.max(1, Number(filters.pageSize) || 50);
+        const start = (page - 1) * pageSize;
+        setItems(filtered.slice(start, start + pageSize));
       }
 
       setLoading(false);
@@ -73,7 +93,7 @@ export default function WritingDiary() {
     const header = ["date", "words", "projectId", "note"];
     const rows = items.map((x) => [
       x.date ?? "",
-      x.words ?? x.wordCount ?? "",
+      x.wordsWritten ?? x.WordsWritten ?? x.words ?? x.wordCount ?? "",
       x.projectId ?? "",
       (x.note ?? "").replace(/\r?\n/g, " "),
     ]);
@@ -150,8 +170,8 @@ export default function WritingDiary() {
               )}
               {items.map((it, idx) => (
                 <tr key={idx}>
-                  <td className="p-2 border">{formatDate(it.date)}</td>
-                  <td className="p-2 border">{it.words ?? it.wordCount ?? "-"}</td>
+                  <td className="p-2 border">{formatDate(it.date ?? it.Date)}</td>
+                  <td className="p-2 border">{it.wordsWritten ?? it.WordsWritten ?? it.words ?? it.wordCount ?? "-"}</td>
                   <td className="p-2 border">{it.projectId ?? "-"}</td>
                   <td className="p-2 border">{it.note ?? ""}</td>
                 </tr>

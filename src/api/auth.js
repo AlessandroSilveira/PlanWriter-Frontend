@@ -5,7 +5,7 @@ export async function login(payload) {
   const response = await api.post("/auth/login", payload);
 
   // CONTRATO ÚNICO
-  return response.data.accessToken;
+  return response.data.accessToken ?? response.data.AccessToken;
 }
 
 // 👇 alias para compatibilidade

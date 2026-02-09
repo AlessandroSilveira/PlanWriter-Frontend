@@ -20,7 +20,6 @@ export async function unfollow(followeeId) {
 
 export async function buddiesLeaderboard(params = {}) {
   const search = new URLSearchParams();
-  if (params.eventId) search.set("eventId", params.eventId);
   if (params.start)   search.set("start", params.start); // "YYYY-MM-DD"
   if (params.end)     search.set("end", params.end);
   const qs = search.toString();

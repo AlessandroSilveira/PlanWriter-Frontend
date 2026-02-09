@@ -1,12 +1,12 @@
-import axios from "axios";
+import api from "./http";
 
 export async function previewValidation(eventId, projectId) {
-  const { data } = await axios.get(`/api/events/${eventId}/validate/preview`, {
+  const { data } = await api.get(`/events/${eventId}/validate/preview`, {
     params: { projectId }
   });
   return data; // { target, total }
 }
 
 export async function submitValidation(eventId, projectId, words, source = "manual") {
-  await axios.post(`/api/events/${eventId}/validate`, { projectId, words, source });
+  await api.post(`/events/${eventId}/validate`, { projectId, words, source });
 }

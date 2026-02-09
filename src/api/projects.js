@@ -106,7 +106,8 @@ export const getProjectProgress = getProjectHistory;
 
 export async function getMonthlyProgress() {
   const { data } = await api.get("/projects/monthly");
-  return data; 
-  // { total: number, month: "YYYY-MM" }
+  return {
+    total: Number(data?.total ?? data?.response ?? 0),
+    month: data?.month,
+  };
 }
-
