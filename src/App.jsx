@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar.jsx";
 import LoginPopover from "./components/LoginPopover.jsx";
@@ -22,7 +22,6 @@ import Validate from "./pages/Validate.jsx";
 import WinnerGoodies from "./pages/WinnerGoodies.jsx";
 import Certificate from "./pages/Certificate.jsx";
 import WordSprint from "./pages/WordSprint.jsx";
-import FocusEditor from "./pages/FocusEditor.jsx";
 import ProfileMe from "./pages/ProfileMe.jsx";
 import PublicProfile from "./pages/PublicProfile.jsx";
 import Resources from "./pages/Resources.jsx";
@@ -117,7 +116,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RequirePasswordChange>
-                <FocusEditor />
+                <Navigate to="/sprint" replace />
               </RequirePasswordChange>
             </ProtectedRoute>
           }

@@ -91,9 +91,6 @@ export default function Navbar() {
               <NavLink to="/projects" className={navLink}>
                 Projetos
               </NavLink>
-              <NavLink to="/write" className={navLink}>
-                Escrever
-              </NavLink>
               <NavLink to="/sprint" className={navLink}>
                 Sprint
               </NavLink>
