@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import LoginPopover from "./LoginPopover";
 
 export default function Navbar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -31,8 +31,9 @@ export default function Navbar() {
     navigate("/", { replace: true });
   };
 
-  const navBase =
-    "fixed top-0 inset-x-0 z-50 transition-all duration-300";
+  const navBase = isLanding
+    ? "fixed top-0 inset-x-0 z-50 transition-all duration-300"
+    : "sticky top-0 inset-x-0 z-50 transition-all duration-300";
 
   const navLanding =
     isLanding && !scrolled
@@ -41,16 +42,21 @@ export default function Navbar() {
 
   return (
     <header className={`${navBase} ${navLanding}`}>
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-3">
         {/* Logo */}
-        <Link to="/" className="text-lg font-semibold tracking-tight">
+        <Link to="/" className="text-lg font-semibold tracking-tight whitespace-nowrap">
           PlanWriter
         </Link>
 
-        {/* LANDING (deslogado) */}
-        {!isAuthenticated && isLanding && (
+        {/* LANDING / PUBLIC (deslogado) */}
+        {!isAuthenticated && (
           <div className="flex items-center gap-4">
+            {!isLanding && (
+              <NavLink to="/resources" className={navLink}>
+                Recursos
+              </NavLink>
+            )}
+
             <button
               onClick={(e) => {
                 setAnchorEl(e.currentTarget);
@@ -77,32 +83,52 @@ export default function Navbar() {
 
         {/* APP (logado) */}
         {isAuthenticated && (
-          <nav className="flex items-center gap-2">
-            <NavLink to="/dashboard" className={navLink}>
-              Dashboard
-            </NavLink>
-            <NavLink to="/projects" className={navLink}>
-              Projetos
-            </NavLink>
-            <NavLink to="/events" className={navLink}>
-              Eventos
-            </NavLink>
-            <NavLink to="/buddies" className={navLink}>
-              Buddies
-            </NavLink>
+          <div className="flex items-center gap-3 min-w-0">
+            <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
+              <NavLink to="/dashboard" className={navLink}>
+                Dashboard
+              </NavLink>
+              <NavLink to="/projects" className={navLink}>
+                Projetos
+              </NavLink>
+              <NavLink to="/write" className={navLink}>
+                Escrever
+              </NavLink>
+              <NavLink to="/sprint" className={navLink}>
+                Sprint
+              </NavLink>
+              <NavLink to="/diary" className={navLink}>
+                Diário
+              </NavLink>
+              <NavLink to="/events" className={navLink}>
+                Eventos
+              </NavLink>
+              <NavLink to="/buddies" className={navLink}>
+                Buddies
+              </NavLink>
+              <NavLink to="/me" className={navLink}>
+                Perfil
+              </NavLink>
+              {user?.isAdmin && (
+                <NavLink to="/admin/events" className={navLink}>
+                  Admin
+                </NavLink>
+              )}
+            </nav>
 
             <button
               onClick={handleLogout}
               className="
-                ml-3 px-3 py-2 rounded-md
+                ml-1 px-3 py-2 rounded-md
                 text-sm text-rose-600
                 hover:bg-rose-50
                 transition
+                whitespace-nowrap
               "
             >
               Sair
             </button>
-          </nav>
+          </div>
         )}
       </div>
     </header>

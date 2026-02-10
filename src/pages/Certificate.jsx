@@ -1,7 +1,7 @@
 // src/pages/Certificate.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/http";
 import Alert from "../components/Alert.jsx";
 import { Skeleton } from "../components/Skeleton.jsx";
 
@@ -28,7 +28,6 @@ export default function Certificate() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState(null); // { userName, projectTitle, eventName, eventStart, eventEnd, targetWords, totalWritten, issuedAt }
-  const [isWinner, setIsWinner] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -36,86 +35,60 @@ export default function Certificate() {
       setLoading(true); setErr("");
 
       try {
-        // Trazemos as peças necessárias com fallbacks comuns
         const tryGet = async (url, params) => {
           try {
-            const r = await axios.get(url, { params });
+            const r = await api.get(url, { params });
             return r?.data ?? null;
           } catch { return null; }
         };
 
-        // 1) Tenta endpoint dedicado de certificado
-        // /api/events/{eventId}/certificate?projectId=...
-        let cert = null;
-        if (eventId && projectId) {
-          cert = await tryGet(`/api/events/${eventId}/certificate`, { projectId });
-        }
-
-        // 2) Se não existir, montamos a partir de outras fontes
         let progress = null;
         let event = null;
         let project = null;
         let user = null;
 
-        // progress do evento
-        if (!cert && eventId && projectId) {
-          progress =
-            await tryGet(`/api/events/${eventId}/progress`, { projectId }) ||
-            await tryGet(`/api/projects/${projectId}/events/${eventId}/progress`) ||
-            await tryGet(`/api/projects/${projectId}/progress`, { eventId });
+        if (eventId && projectId) {
+          progress = await tryGet(`/events/${eventId}/projects/${projectId}/progress`);
         }
 
-        // evento
-        if (!cert && eventId) {
-          event =
-            await tryGet(`/api/events/${eventId}`) ||
-            await tryGet(`/api/event/${eventId}`);
+        if (eventId) {
+          event = await tryGet(`/events/${eventId}`);
         }
 
-        // projeto
-        if (!cert && projectId) {
-          project =
-            await tryGet(`/api/projects/${projectId}`) ||
-            await tryGet(`/api/project/${projectId}`);
+        if (projectId) {
+          project = await tryGet(`/projects/${projectId}`);
         }
 
-        // dados do usuário logado
-        user =
-          await tryGet("/api/me") ||
-          await tryGet("/api/profile/me") ||
-          (progress?.user ? progress.user : null);
+        user = await tryGet("/profile/me");
 
-        // normalização do “cert”
-        let built = cert ? {
-          userName: cert.userName ?? cert.UserName ?? user?.name ?? user?.displayName ?? "Autor(a)",
-          projectTitle: cert.projectTitle ?? cert.ProjectTitle ?? project?.title ?? project?.name ?? "Projeto",
-          eventName: cert.eventName ?? cert.EventName ?? event?.name ?? event?.Name ?? "Evento",
-          eventStart: cert.eventStart ?? cert.startsAtUtc ?? event?.startsAtUtc ?? event?.startsAt ?? event?.StartsAtUtc ?? null,
-          eventEnd: cert.eventEnd ?? cert.endsAtUtc ?? event?.endsAtUtc ?? event?.endsAt ?? event?.EndsAtUtc ?? null,
-          targetWords: Number(cert.targetWords ?? cert.TargetWords ?? progress?.targetWords ?? progress?.TargetWords ?? 0) || 0,
-          totalWritten: Number(cert.totalWritten ?? cert.TotalWritten ?? progress?.totalWritten ?? progress?.TotalWritten ?? 0) || 0,
-          issuedAt: cert.issuedAt ?? new Date().toISOString(),
-          badge: cert.badge ?? "Winner",
-        } : {
-          userName: user?.name ?? user?.displayName ?? progress?.userName ?? "Autor(a)",
-          projectTitle: project?.title ?? project?.name ?? progress?.projectTitle ?? "Projeto",
-          eventName: event?.name ?? event?.Name ?? "Evento",
+        if (!progress) {
+          if (!alive) return;
+          setErr("Não foi possível carregar o progresso do evento para este projeto.");
+          setData(null);
+          return;
+        }
+
+        const built = {
+          userName: user?.displayName ?? user?.name ?? "Autor(a)",
+          projectTitle: project?.title ?? project?.name ?? "Projeto",
+          eventName: progress?.name ?? event?.name ?? event?.Name ?? "Evento",
           eventStart: event?.startsAtUtc ?? event?.startsAt ?? event?.StartsAtUtc ?? null,
           eventEnd: event?.endsAtUtc ?? event?.endsAt ?? event?.EndsAtUtc ?? null,
-          targetWords: Number(progress?.targetWords ?? progress?.TargetWords ?? 0) || 0,
-          totalWritten: Number(progress?.totalWritten ?? progress?.TotalWritten ?? 0) || 0,
-          issuedAt: new Date().toISOString(),
+          targetWords: Number(
+            progress?.targetWords ?? progress?.TargetWords ??
+            event?.defaultTargetWords ?? event?.DefaultTargetWords ?? 0
+          ) || 0,
+          totalWritten: Number(progress?.totalWrittenInEvent ?? progress?.TotalWrittenInEvent ?? 0) || 0,
+          issuedAt: progress?.validatedAtUtc ?? progress?.ValidatedAtUtc ?? new Date().toISOString(),
           badge: "Winner",
         };
 
         const winner =
-          !!(cert?.winner ?? cert?.isWinner) ||
           !!(progress?.won ?? progress?.Won ?? progress?.isWinner) ||
           (built.totalWritten >= Math.max(1, built.targetWords));
 
         if (!alive) return;
 
-        setIsWinner(winner);
         if (!winner) {
           setErr("Este projeto ainda não é Winner neste evento. Complete a meta e valide para emitir o certificado.");
         }

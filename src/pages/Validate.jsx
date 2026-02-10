@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProjects } from "../api/projects";
-import { getActiveEvents, getEventProgress } from "../api/events";
+import { getActiveEvents } from "../api/events";
 import { previewValidation, submitValidation } from "../api/validation";
 
 function countWordsStrict(text) {

@@ -1,6 +1,6 @@
 // src/components/TodayTargetCard.jsx
 import { useEffect, useMemo, useState } from "react";
-import { getActiveEvents, getEventProgress } from "../api/events";
+import { getActiveEvents, getEventProjectProgress } from "../api/events";
 import { getProjectHistory } from "../api/projects";
 
 /**
@@ -53,7 +53,8 @@ export default function TodayTargetCard({ project }) {
         const active = Array.isArray(evs) && evs.length ? evs[0] : null;
         if (active) {
           try {
-            const p = await getEventProgress({ projectId, eventId: active.id || active.Id });
+            const eventId = active.id ?? active.Id;
+            const p = await getEventProjectProgress(eventId, projectId);
             if (alive && p?.dailyTarget) {
               setMode("event");
               setDailyTarget(Number(p.dailyTarget) || 0);

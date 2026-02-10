@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../api/http";
 import HistoryFilters from "../components/HistoryFilters.jsx";
 import HistoryTable from "../components/HistoryTable.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -57,6 +57,12 @@ export default function WritingDiary() {
   const fetchHistory = useCallback(async () => {
     setLoading(true); setErr("");
     try {
+      if (!filters.projectId) {
+        setErr("Selecione um projeto para ver o histórico.");
+        setRows([]); setTotal(0);
+        return;
+      }
+
       const params = {
         projectId: filters.projectId || undefined,
         eventId: filters.eventId || undefined,
@@ -70,43 +76,56 @@ export default function WritingDiary() {
         pageSize,
       };
 
-      const tryGet = async (url) => {
-        try {
-          const res = await axios.get(url, { params });
-          if (res?.data) return res.data;
-        } catch { /* tenta próximo */ }
-        return null;
-      };
-
-      // prioridades de endpoint:
-      // A) /api/writing/history
-      // B) /api/progress/history
-      // C) /api/projects/{projectId}/progress/history (se houver filtro de projeto)
-      // D) /api/me/progress/history
-      let data =
-        await tryGet("/api/writing/history") ||
-        await tryGet("/api/progress/history") ||
-        (filters.projectId ? await tryGet(`/api/projects/${filters.projectId}/progress/history`) : null) ||
-        await tryGet("/api/me/progress/history");
+      const res = await api.get(
+        `/projects/${filters.projectId}/progress/history`,
+        { params }
+      );
+      const data = res?.data ?? null;
 
       // normaliza
       const items = Array.isArray(data?.items) ? data.items
         : Array.isArray(data?.data) ? data.data
         : Array.isArray(data) ? data
         : [];
-      const totalCount = Number(data?.total ?? data?.totalCount ?? items.length) || items.length;
 
       const normalized = items.map((it) => {
-        const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.createdAt ?? it.CreatedAt ?? null;
-        const deltaWords = Number(it.wordsAdded ?? it.deltaWords ?? it.WordsAdded ?? it.words ?? it.Words ?? 0) || 0;
+        const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.Date ?? it.createdAt ?? it.CreatedAt ?? null;
+        const deltaWords = Number(
+          it.wordsWritten ?? it.WordsWritten ?? it.wordsAdded ?? it.deltaWords ??
+          it.WordsAdded ?? it.words ?? it.Words ?? 0
+        ) || 0;
         const notes = it.notes ?? it.Notes ?? "";
         const projectTitle = it.projectTitle ?? it.ProjectTitle ?? it.projectName ?? it.ProjectName ?? "";
         const eventName = it.eventName ?? it.EventName ?? it.eventTitle ?? it.EventTitle ?? "";
         const source = it.source ?? it.Source ?? "";
-        return { ...it, dateFmt: fmtDateBR(date), deltaWords, notes, projectTitle, eventName, source };
+        return { ...it, dateRaw: date, dateFmt: fmtDateBR(date), deltaWords, notes, projectTitle, eventName, source };
       });
 
-      setRows(normalized);
+      const from = filters.dateFrom ? new Date(filters.dateFrom) : null;
+      const to = filters.dateTo ? new Date(filters.dateTo) : null;
+      if (from) from.setHours(0, 0, 0, 0);
+      if (to) to.setHours(23, 59, 59, 999);
+      const minWords = filters.minWords !== "" ? Number(filters.minWords) : null;
+      const maxWords = filters.maxWords !== "" ? Number(filters.maxWords) : null;
+
+      const filtered = normalized.filter((row) => {
+        if (from || to) {
+          const d = row.dateRaw ? new Date(row.dateRaw) : null;
+          if (d && !Number.isNaN(d.getTime())) {
+            if (from && d < from) return false;
+            if (to && d > to) return false;
+          }
+        }
+        if (minWords !== null && row.deltaWords < minWords) return false;
+        if (maxWords !== null && row.deltaWords > maxWords) return false;
+        return true;
+      });
+
+      const totalCount = filtered.length;
+      const start = Math.max(0, (page - 1) * pageSize);
+      const paged = filtered.slice(start, start + pageSize);
+
+      setRows(paged);
       setTotal(totalCount);
     } catch (e) {
       setErr(e?.response?.data?.message || e?.message || "Falha ao carregar histórico.");
