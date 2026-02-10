@@ -15,11 +15,16 @@ export default function RecentBadges({ projectId, take = 6 }) {
     if (!projectId) return;
     (async () => {
       try {
-        const { data } = await api.get(`/badges/projectid/${projectId}`);
+        const { data } = await api.get(`/badges/projectId/${projectId}`);
         const arr = Array.isArray(data) ? data.slice(0, take) : [];
         setList(arr);
       } catch (e) {
-        setErr(e?.response?.data?.message || e?.message || "Falha ao carregar conquistas.");
+        setErr(
+          e?.response?.data?.title ||
+            e?.response?.data?.message ||
+            e?.message ||
+            "Falha ao carregar conquistas."
+        );
       }
     })();
   }, [projectId, take]);

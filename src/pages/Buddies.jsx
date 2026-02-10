@@ -12,10 +12,18 @@ function clsx(...c) {
   return c.filter(Boolean).join(" ");
 }
 
+function getApiErrorMessage(error) {
+  const data = error?.response?.data;
+  if (!data) return error?.message || "Erro inesperado.";
+  if (typeof data === "string") return data;
+  return data?.title || data?.message || error?.message || "Erro inesperado.";
+}
+
 export default function Buddies() {
   const [buddies, setBuddies] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   // follow form
   const [email, setEmail] = useState("");
@@ -31,8 +39,9 @@ export default function Buddies() {
 
   async function refresh() {
     setLoading(true);
+    setError("");
 
-    const [b, lb] = await Promise.all([
+    const [bResult, lbResult] = await Promise.allSettled([
       listBuddies(),
       buddiesLeaderboard({
         start: start || undefined,
@@ -40,8 +49,26 @@ export default function Buddies() {
       }),
     ]);
 
-    setBuddies(b || []);
-    setLeaderboard(Array.isArray(lb) ? lb : []);
+    const errors = [];
+
+    if (bResult.status === "fulfilled") {
+      setBuddies(bResult.value || []);
+    } else {
+      setBuddies([]);
+      errors.push(`Buddies: ${getApiErrorMessage(bResult.reason)}`);
+    }
+
+    if (lbResult.status === "fulfilled") {
+      setLeaderboard(Array.isArray(lbResult.value) ? lbResult.value : []);
+    } else {
+      setLeaderboard([]);
+      errors.push(`Leaderboard: ${getApiErrorMessage(lbResult.reason)}`);
+    }
+
+    if (errors.length > 0) {
+      setError(errors.join(" | "));
+    }
+
     setLoading(false);
   }
 
@@ -56,18 +83,26 @@ export default function Buddies() {
 
     try {
       setFollowing(true);
+      setError("");
       await followByEmail(email.trim());
       setEmail("");
       await refresh();
       setShowSuccess(true);
+    } catch (e2) {
+      setError(getApiErrorMessage(e2));
     } finally {
       setFollowing(false);
     }
   }
 
   async function onUnfollow(id) {
-    await unfollow(id);
-    await refresh();
+    try {
+      setError("");
+      await unfollow(id);
+      await refresh();
+    } catch (e2) {
+      setError(getApiErrorMessage(e2));
+    }
   }
 
   async function onApplyFilters(e) {
@@ -95,6 +130,12 @@ export default function Buddies() {
       <header>
         <h1 className="text-2xl font-semibold">Buddies</h1>
       </header>
+
+      {error && (
+        <section className="panel">
+          <p className="text-red-600">{error}</p>
+        </section>
+      )}
 
       {/* MODAL DE SUCESSO */}
       {showSuccess && (

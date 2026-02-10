@@ -352,6 +352,7 @@ export default function ProjectDetails() {
         open={openModal}
         onClose={() => setOpenModal(false)}
         projectId={id}
+        goalUnit={project?.goalUnit ?? project?.GoalUnit ?? "Words"}
         onSaved={reload}
       />
     </div>

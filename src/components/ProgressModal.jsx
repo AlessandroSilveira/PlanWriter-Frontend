@@ -3,6 +3,28 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/http"; 
 import Alert from "./Alert.jsx";
 
+function normalizeGoalUnit(goalUnit) {
+  const unit = String(goalUnit || "Words").toLowerCase();
+  if (unit === "minutes" || unit === "pages" || unit === "words") return unit;
+  return "words";
+}
+
+function getApiErrorMessage(error) {
+  const data = error?.response?.data;
+  if (!data) return error?.message || "Falha ao lançar o progresso.";
+
+  if (typeof data === "string") return data;
+  if (typeof data?.title === "string" && data.title) return data.title;
+  if (typeof data?.message === "string" && data.message) return data.message;
+
+  if (data?.errors && typeof data.errors === "object") {
+    const first = Object.values(data.errors)?.[0];
+    if (Array.isArray(first) && first.length > 0) return String(first[0]);
+  }
+
+  return error?.message || "Falha ao lançar o progresso.";
+}
+
 /**
  * Props:
  *  - open: boolean
@@ -35,6 +57,7 @@ export default function ProgressModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const unit = normalizeGoalUnit(goalUnit);
 
   const wasOpen = useRef(false);
 
@@ -53,31 +76,31 @@ export default function ProgressModal({
       const dt = initialDate || new Date().toISOString().slice(0, 10);
       setDate(dt);
 
-      setWords(goalUnit === "Words" ? (defaultWords || "") : "");
-      setMinutes(goalUnit === "Minutes" ? "" : "");
-      setPages(goalUnit === "Pages" ? "" : "");
+      setWords(unit === "words" ? (defaultWords || "") : "");
+      setMinutes(unit === "minutes" ? "" : "");
+      setPages(unit === "pages" ? "" : "");
     }
-  }, [open, defaultWords, defaultNote, goalUnit, initialDate]);
+  }, [open, defaultWords, defaultNote, unit, initialDate]);
 
   const unitLabel =
-    goalUnit === "Minutes"
+    unit === "minutes"
       ? "Minutos"
-      : goalUnit === "Pages"
+      : unit === "pages"
       ? "Páginas"
       : "Palavras";
 
   /* ---------------- Validação ---------------- */
   const valid = useMemo(() => {
-    const w = Number(words) || 0;
-    const m = Number(minutes) || 0;
-    const p = Number(pages) || 0;
+    const w = Number(words);
+    const m = Number(minutes);
+    const p = Number(pages);
 
     if (!projectId || !date) return false;
 
-    if (goalUnit === "Minutes") return m > 0;
-    if (goalUnit === "Pages") return p > 0;
-    return w > 0;
-  }, [projectId, date, words, minutes, pages, goalUnit]);
+    if (unit === "minutes") return Number.isFinite(m) && m > 0;
+    if (unit === "pages") return Number.isFinite(p) && p > 0;
+    return Number.isFinite(w) && w > 0;
+  }, [projectId, date, words, minutes, pages, unit]);
 
   /* ---------------- Salvar ---------------- */
   const save = async () => {
@@ -90,23 +113,20 @@ export default function ProgressModal({
     try {
       const payload = {
         projectId,
-        date,
+        date: `${date}T00:00:00`,
         notes: notes?.trim() || undefined,
-        wordsWritten: goalUnit === "Words" ? Number(words) : undefined,
-        minutes: goalUnit === "Minutes" ? Number(minutes) : undefined,
-        pages: goalUnit === "Pages" ? Number(pages) : undefined,
       };
+
+      if (unit === "minutes") payload.minutes = Number(minutes);
+      else if (unit === "pages") payload.pages = Number(pages);
+      else payload.wordsWritten = Number(words);
 
       await api.post(`/projects/${projectId}/progress`, payload);
 
       onSaved?.(); // recarregar
       onClose?.(); // 🔥 fecha o modal automaticamente
     } catch (e) {
-      setErr(
-        e?.response?.data?.message ||
-          e?.message ||
-          "Falha ao lançar o progresso."
-      );
+      setErr(getApiErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -150,7 +170,7 @@ export default function ProgressModal({
           </label>
 
           {/* Campo condicional */}
-          {goalUnit === "Minutes" ? (
+          {unit === "minutes" ? (
             <label className="flex flex-col gap-1">
               <span className="label">Minutos</span>
               <input
@@ -161,7 +181,7 @@ export default function ProgressModal({
                 onChange={(e) => setMinutes(e.target.value)}
               />
             </label>
-          ) : goalUnit === "Pages" ? (
+          ) : unit === "pages" ? (
             <label className="flex flex-col gap-1">
               <span className="label">Páginas</span>
               <input

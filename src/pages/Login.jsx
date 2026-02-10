@@ -1,12 +1,12 @@
 // src/pages/Login.jsx
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { setToken } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,12 +17,16 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      const { token } = await loginApi(email, password);
+      const token = await loginApi({ email, password });
       if (!token) throw new Error("Token não retornado pelo backend");
-      setToken(token);
-      navigate("/");
+      login(token);
+      navigate("/dashboard", { replace: true });
     } catch (ex) {
-      const msg = ex?.response?.data?.message || ex?.message || "Falha no login";
+      const msg =
+        ex?.response?.data?.title ||
+        ex?.response?.data?.message ||
+        ex?.message ||
+        "Falha no login";
       setError(msg);
     } finally {
       setLoading(false);

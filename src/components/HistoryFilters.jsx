@@ -20,6 +20,12 @@ export default function HistoryFilters({ projects = [], events = [], initial = {
   const canSubmit = useMemo(() => true, []);
 
   useEffect(() => {
+    if (projectId || projects.length === 0) return;
+    const firstProjectId = projects[0]?.id ?? projects[0]?.projectId ?? "";
+    if (firstProjectId) setProjectId(firstProjectId);
+  }, [projectId, projects]);
+
+  useEffect(() => {
     onChange?.({ projectId, eventId, source, dateFrom, dateTo, minWords, maxWords, sort });
   }, [projectId, eventId, source, dateFrom, dateTo, minWords, maxWords, sort]); // eslint-disable-line
 
