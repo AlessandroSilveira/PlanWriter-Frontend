@@ -6,6 +6,29 @@ import axios from "axios";
 // - Se preferir chamar a API diretamente, defina VITE_API_URL="http://localhost:5000/api" no .env.
 const baseURL =
   import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "/api";
+const TOKEN_KEYS = ["token", "accessToken", "jwt"];
+
+function readStoredToken() {
+  try {
+    for (const key of TOKEN_KEYS) {
+      const value = localStorage.getItem(key);
+      if (typeof value === "string" && value.trim().length > 0) {
+        return value;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function clearStoredTokens() {
+  try {
+    TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // ignore
+  }
+}
 
 const api = axios.create({
   baseURL,
@@ -15,11 +38,7 @@ const api = axios.create({
 // 2) Interceptor p/ Authorization: Bearer <token>
 api.interceptors.request.use((config) => {
   try {
-    const token =
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("jwt") ||
-      null;
+    const token = readStoredToken();
 
     if (token) {
       config.headers = config.headers || {};
@@ -30,5 +49,26 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url ?? "");
+
+    if (
+      status === 401 &&
+      !requestUrl.includes("/auth/login") &&
+      !requestUrl.includes("/auth/register")
+    ) {
+      clearStoredTokens();
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.assign("/");
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;

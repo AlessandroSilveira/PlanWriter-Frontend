@@ -92,10 +92,11 @@ export const addProgress = async (
 
 // =====================
 // Badges
-// BACKEND: GET /badges/projectid/{id}
+// BACKEND: GET /badges/projectId/{id}
 // =====================
 export const getProjectBadges = async (projectId) => {
-  const { data } = await api.get(`/badges/projectid/${projectId}`);
+  if (!projectId) return [];
+  const { data } = await api.get(`/badges/projectId/${projectId}`);
   return Array.isArray(data) ? data : [];
 };
 

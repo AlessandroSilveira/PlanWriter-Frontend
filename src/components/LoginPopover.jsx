@@ -3,6 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
+function decodeJwtPayload(token) {
+  const payloadBase64Url = token.split(".")[1];
+  if (!payloadBase64Url) return null;
+  const base64 = payloadBase64Url.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  return JSON.parse(atob(padded));
+}
+
+function parseBool(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.toLowerCase() === "true";
+  return false;
+}
+
 export default function LoginPopover({ open, anchorEl, onClose }) {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -35,30 +49,31 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
       onClose?.();
 
       // decodifica JWT
-      const decoded = JSON.parse(atob(token.split(".")[1]));
+      const decoded = decodeJwtPayload(token) || {};
       console.log("📦 decoded", decoded);
 
 
-      const mustChangePassword = decoded.mustChangePassword === "true";
-      const isAdmin = decoded.isAdmin === "true";
+      const mustChangePassword = parseBool(decoded.mustChangePassword);
+      const isAdmin = parseBool(decoded.isAdmin);
 
       console.log("➡️ redirect decision", {
   isAdmin,
   mustChangePassword
 });
 
-      if (isAdmin && mustChangePassword) {
+      if (mustChangePassword) {
         navigate("/change-password", { replace: true });
+        return;
       }
-       if (isAdmin && !mustChangePassword) {
+      if (isAdmin) {
         navigate("/admin/events", { replace: true });
+        return;
       }
-       if(!isAdmin && !mustChangePassword) {
-        navigate("/dashboard", { replace: true });
-      }
+      navigate("/dashboard", { replace: true });
 
     } catch (err) {
       const msg =
+        err?.response?.data?.title ||
         err?.response?.data?.message ||
         err?.message ||
         "Falha ao fazer login.";
