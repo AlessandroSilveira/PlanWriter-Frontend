@@ -341,17 +341,10 @@ export default function Dashboard() {
         </div>
 
         {/* EVENTOS */}
-        <section className="container mt-4">
-          <div className="panel">
-            <h2 className="section-title">Eventos em que você está participando</h2>
-
-            {eventsLoading ? (
-              <p className="text-sm text-muted mt-2">Carregando eventos…</p>
-            ) : myEvents.length === 0 ? (
-              <p className="text-sm text-muted mt-2">
-                Você não está participando de nenhum evento no momento.
-              </p>
-            ) : (
+        {!eventsLoading && myEvents.length > 0 && (
+          <section className="container mt-4">
+            <div className="panel">
+              <h2 className="section-title">Eventos em que você está participando</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                 {myEvents.map((ev) => (
                   <EventProgressCard
@@ -360,9 +353,9 @@ export default function Dashboard() {
                   />
                 ))}
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
 
         {/* META DE HOJE */}
         {first && (
