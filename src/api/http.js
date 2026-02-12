@@ -35,9 +35,18 @@ const api = axios.create({
   withCredentials: false,
 });
 
+function isPublicAuthRequest(url) {
+  const normalized = String(url ?? "").toLowerCase();
+  return normalized.includes("/auth/login") || normalized.includes("/auth/register");
+}
+
 // 2) Interceptor p/ Authorization: Bearer <token>
 api.interceptors.request.use((config) => {
   try {
+    if (isPublicAuthRequest(config?.url)) {
+      return config;
+    }
+
     const token = readStoredToken();
 
     if (token) {
