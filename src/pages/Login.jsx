@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
+import FeedbackModal from "../components/FeedbackModal.jsx";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,12 +11,18 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "Entendi",
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setFeedback((prev) => ({ ...prev, open: false }));
     try {
       const token = await loginApi({ email, password });
       if (!token) throw new Error("Token não retornado pelo backend");
@@ -27,7 +34,13 @@ export default function Login() {
         ex?.response?.data?.message ||
         ex?.message ||
         "Falha no login";
-      setError(msg);
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Falha no login",
+        message: msg,
+        primaryLabel: "Fechar",
+      });
     } finally {
       setLoading(false);
     }
@@ -47,7 +60,6 @@ export default function Login() {
             <label>Senha</label>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          {error && <p style={{ color: '#dc2626', fontSize: 14 }}>{error}</p>}
           <button className="btn" type="submit" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}
           </button>
@@ -58,6 +70,14 @@ export default function Login() {
           Não tem conta? <Link to="/register">Criar conta</Link>
         </p>
       </div>
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

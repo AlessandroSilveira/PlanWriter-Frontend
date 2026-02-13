@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { register } from "../api/auth";
+import FeedbackModal from "../components/FeedbackModal.jsx";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -16,9 +17,15 @@ export default function Register() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "Entendi",
+    onPrimary: null,
+  });
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -26,11 +33,16 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(""); 
-
 
     if (form.password !== form.confirmPassword) {
-      setError("As senhas não coincidem.");
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Não foi possível criar sua conta",
+        message: "As senhas não coincidem.",
+        primaryLabel: "Fechar",
+        onPrimary: null,
+      });
       return;
     }
 
@@ -45,15 +57,27 @@ export default function Register() {
         password: form.password,
       });
 
-      // ✅ Cadastro OK → vai para login
-      setSuccess(true);
-      //navigate("/", { replace: true });
+      setFeedback({
+        open: true,
+        type: "success",
+        title: "Usuário cadastrado com sucesso",
+        message: "Faça o login para entrar no dashboard.",
+        primaryLabel: "Ir para login",
+        onPrimary: () => navigate("/", { replace: true }),
+      });
 
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
         "Falha no cadastro. Verifique os dados e tente novamente.";
-      setError(msg);
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Não foi possível criar sua conta",
+        message: msg,
+        primaryLabel: "Fechar",
+        onPrimary: null,
+      });
     } finally {
       setLoading(false);
     }
@@ -157,12 +181,6 @@ export default function Register() {
             </div>
           </div>
 
-          {error && (
-            <div className="text-sm text-red-600 text-center">
-              {error}
-            </div>
-          )}
-
           <div className="flex justify-end mt-4">
             <button
               type="submit"
@@ -181,32 +199,21 @@ export default function Register() {
           </Link>
         </div>
       </div>
-      {success && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center">
-      <div className="flex justify-center mb-4">
-        <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-100 text-green-600 text-xl font-bold">
-          ✓
-        </div>
-      </div>
-
-      <h2 className="text-lg font-semibold mb-2">
-        Usuário cadastrado com sucesso
-      </h2>
-
-      <p className="text-sm text-gray-600 mb-6">
-        Faça o login para entrar no dashboard.
-      </p>
-
-      <button
-        onClick={() => navigate("/", { replace: true })}
-        className="px-6 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
-      >
-        Ir para login
-      </button>
-    </div>
-  </div>
-)}
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onPrimary={feedback.onPrimary || undefined}
+        onClose={() =>
+          setFeedback((prev) => ({
+            ...prev,
+            open: false,
+            onPrimary: null,
+          }))
+        }
+      />
 
     </div>
   );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import FeedbackModal from "./FeedbackModal.jsx";
 
 function decodeJwtPayload(token) {
   const payloadBase64Url = token.split(".")[1];
@@ -22,7 +23,13 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "Entendi",
+  });
   const navigate = useNavigate();
 
   if (!open) return null;
@@ -30,7 +37,7 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setFeedback((prev) => ({ ...prev, open: false }));
 
     try {
       // chama API
@@ -77,7 +84,13 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
         err?.response?.data?.message ||
         err?.message ||
         "Falha ao fazer login.";
-      setError(msg);
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Falha no login",
+        message: msg,
+        primaryLabel: "Fechar",
+      });
     } finally {
       setLoading(false);
     }
@@ -143,8 +156,6 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
           <div className="flex gap-2 mt-2">
             <button
               type="submit"
@@ -173,6 +184,14 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
           </button>
         </div>
       </div>
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

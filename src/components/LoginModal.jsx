@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import FeedbackModal from "./FeedbackModal.jsx";
 
 export default function LoginModal({ open, onClose }) {
   const { login } = useAuth();
@@ -9,7 +10,13 @@ export default function LoginModal({ open, onClose }) {
 
   const [mode, setMode] = useState("login"); // login | register
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "Entendi",
+  });
 
   // login fields
   const [email, setEmail] = useState("");
@@ -22,9 +29,9 @@ export default function LoginModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
-    setErr("");
     setLoading(false);
     setMode("login");
+    setFeedback((prev) => ({ ...prev, open: false }));
   }, [open]);
 
   useEffect(() => {
@@ -37,7 +44,6 @@ export default function LoginModal({ open, onClose }) {
 
   const submitLogin = async (e) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
     try {
       const token = await loginApi({ email, password });
@@ -46,11 +52,13 @@ export default function LoginModal({ open, onClose }) {
       onClose?.();
       navigate("/dashboard");
     } catch (ex) {
-      setErr(
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no login"
-      );
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Falha no login",
+        message: ex?.response?.data?.message || ex?.message || "Falha no login",
+        primaryLabel: "Fechar",
+      });
     } finally {
       setLoading(false);
     }
@@ -58,7 +66,6 @@ export default function LoginModal({ open, onClose }) {
 
   const submitRegister = async (e) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
     try {
       await register({
@@ -71,13 +78,21 @@ export default function LoginModal({ open, onClose }) {
 
       // após registro, já volta para login
       setMode("login");
-      setErr("Conta criada com sucesso. Faça login.");
+      setFeedback({
+        open: true,
+        type: "success",
+        title: "Conta criada com sucesso",
+        message: "Faça login para acessar o dashboard.",
+        primaryLabel: "Continuar",
+      });
     } catch (ex) {
-      setErr(
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no cadastro"
-      );
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Falha no cadastro",
+        message: ex?.response?.data?.message || ex?.message || "Falha no cadastro",
+        primaryLabel: "Fechar",
+      });
     } finally {
       setLoading(false);
     }
@@ -129,12 +144,6 @@ export default function LoginModal({ open, onClose }) {
                 required
               />
             </div>
-
-            {err && (
-              <div className="text-sm text-red-600">
-                {err}
-              </div>
-            )}
 
             <button
               className="btn-primary w-full"
@@ -211,12 +220,6 @@ export default function LoginModal({ open, onClose }) {
               />
             </div>
 
-            {err && (
-              <div className="text-sm text-red-600">
-                {err}
-              </div>
-            )}
-
             <button
               className="btn-primary w-full"
               type="submit"
@@ -238,6 +241,14 @@ export default function LoginModal({ open, onClose }) {
           </form>
         )}
       </div>
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }
