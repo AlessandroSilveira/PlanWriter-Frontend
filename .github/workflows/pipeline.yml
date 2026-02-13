@@ -1,0 +1,82 @@
+name: PlanWriter Frontend Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: planwriter-frontend-main-pipeline
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy (Docker Compose on self-hosted)
+    runs-on:
+      - self-hosted
+      - macOS
+      - deploy
+    needs:
+      - build
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    env:
+      DEPLOY_ROOT: ${{ secrets.DEPLOY_ROOT }}
+
+    steps:
+      - name: Validate deploy root
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_ROOT:-}" ]; then
+            echo "Secret DEPLOY_ROOT nao configurado."
+            exit 1
+          fi
+
+      - name: Update repositories and deploy
+        run: |
+          set -euo pipefail
+
+          BACKEND_DIR="$DEPLOY_ROOT/PlanWriter"
+          FRONTEND_DIR="$DEPLOY_ROOT/PlanWriter-Frontend"
+
+          if [ ! -d "$BACKEND_DIR/.git" ]; then
+            echo "Repositorio backend nao encontrado em: $BACKEND_DIR"
+            exit 1
+          fi
+
+          if [ ! -d "$FRONTEND_DIR/.git" ]; then
+            echo "Repositorio frontend nao encontrado em: $FRONTEND_DIR"
+            exit 1
+          fi
+
+          git -C "$BACKEND_DIR" checkout main
+          git -C "$BACKEND_DIR" pull --ff-only origin main
+
+          git -C "$FRONTEND_DIR" checkout main
+          git -C "$FRONTEND_DIR" pull --ff-only origin main
+
+          docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d --build
+          docker compose -f "$BACKEND_DIR/docker-compose.yml" ps

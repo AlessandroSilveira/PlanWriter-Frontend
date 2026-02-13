@@ -26,3 +26,7 @@ npm run dev
 ## Observações
 - O token JWT é guardado no localStorage e enviado em `Authorization: Bearer ...`.
 - Base URL lida de `VITE_API_URL`.
+
+## CI/CD
+- Pipeline: `.github/workflows/pipeline.yml`
+- Guia de configuração: `docs/deploy-github-actions.md`
