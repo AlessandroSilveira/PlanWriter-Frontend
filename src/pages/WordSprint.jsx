@@ -58,6 +58,15 @@ export default function WordSprint() {
     setFlash("Sprint finalizado!");
   }, []);
 
+  const finishSprintEarly = () => {
+    if (finished || !startedByTyping.current) return;
+
+    setRunning(false);
+    setFinished(true);
+    setSavedToProject(false);
+    setFlash("Sprint concluído antes do tempo ✅");
+  };
+
   /* =========================
      SAVE TO PROJECT (MANUAL)
      ========================= */
@@ -232,6 +241,12 @@ export default function WordSprint() {
             <button className="button" onClick={resetSprint} disabled={running}>
               Resetar
             </button>
+
+            {!finished && startedByTyping.current && (
+              <button className="btn-primary" onClick={finishSprintEarly}>
+                Concluir agora
+              </button>
+            )}
           </div>
         </div>
 
