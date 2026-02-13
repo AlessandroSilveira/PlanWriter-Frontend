@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,12 +23,7 @@ export default function Login() {
       login(token);
       navigate("/dashboard", { replace: true });
     } catch (ex) {
-      const msg =
-        ex?.response?.data?.title ||
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no login";
-      setError(msg);
+      setError(getAuthFriendlyMessage(ex, "Não foi possível concluir o login. Tente novamente."));
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 export default function LoginModal({ open, onClose }) {
   const { login } = useAuth();
@@ -9,7 +10,14 @@ export default function LoginModal({ open, onClose }) {
 
   const [mode, setMode] = useState("login"); // login | register
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "success", // success | error
+    title: "",
+    message: "",
+    actionText: "Fechar",
+    onAction: null,
+  });
 
   // login fields
   const [email, setEmail] = useState("");
@@ -20,11 +28,32 @@ export default function LoginModal({ open, onClose }) {
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
 
+  const showFeedback = ({
+    type = "success",
+    title = "",
+    message = "",
+    actionText = "Fechar",
+    onAction = null,
+  }) => {
+    setFeedback({
+      open: true,
+      type,
+      title,
+      message,
+      actionText,
+      onAction,
+    });
+  };
+
+  const closeFeedback = () => {
+    setFeedback((prev) => ({ ...prev, open: false, onAction: null }));
+  };
+
   useEffect(() => {
     if (!open) return;
-    setErr("");
     setLoading(false);
     setMode("login");
+    closeFeedback();
   }, [open]);
 
   useEffect(() => {
@@ -37,7 +66,6 @@ export default function LoginModal({ open, onClose }) {
 
   const submitLogin = async (e) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
     try {
       const token = await loginApi({ email, password });
@@ -46,11 +74,11 @@ export default function LoginModal({ open, onClose }) {
       onClose?.();
       navigate("/dashboard");
     } catch (ex) {
-      setErr(
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no login"
-      );
+      showFeedback({
+        type: "error",
+        title: "Não foi possível entrar",
+        message: getAuthFriendlyMessage(ex, "Não foi possível concluir o login. Tente novamente."),
+      });
     } finally {
       setLoading(false);
     }
@@ -58,7 +86,6 @@ export default function LoginModal({ open, onClose }) {
 
   const submitRegister = async (e) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
     try {
       await register({
@@ -69,15 +96,22 @@ export default function LoginModal({ open, onClose }) {
         password,
       });
 
-      // após registro, já volta para login
       setMode("login");
-      setErr("Conta criada com sucesso. Faça login.");
+      showFeedback({
+        type: "success",
+        title: "Usuário cadastrado com sucesso",
+        message: "Faça o login para entrar no dashboard.",
+        actionText: "Ir para login",
+      });
     } catch (ex) {
-      setErr(
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no cadastro"
-      );
+      showFeedback({
+        type: "error",
+        title: "Falha no cadastro",
+        message:
+          ex?.response?.data?.message ||
+          ex?.message ||
+          "Falha no cadastro",
+      });
     } finally {
       setLoading(false);
     }
@@ -129,12 +163,6 @@ export default function LoginModal({ open, onClose }) {
                 required
               />
             </div>
-
-            {err && (
-              <div className="text-sm text-red-600">
-                {err}
-              </div>
-            )}
 
             <button
               className="btn-primary w-full"
@@ -211,12 +239,6 @@ export default function LoginModal({ open, onClose }) {
               />
             </div>
 
-            {err && (
-              <div className="text-sm text-red-600">
-                {err}
-              </div>
-            )}
-
             <button
               className="btn-primary w-full"
               type="submit"
@@ -238,6 +260,42 @@ export default function LoginModal({ open, onClose }) {
           </form>
         )}
       </div>
+
+      {feedback.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div
+                className={`w-12 h-12 flex items-center justify-center rounded-full text-xl font-bold ${
+                  feedback.type === "success"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-red-100 text-red-600"
+                }`}
+              >
+                {feedback.type === "success" ? "✓" : "!"}
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold mb-2">{feedback.title}</h2>
+            <p className="text-sm text-gray-600 mb-6">{feedback.message}</p>
+
+            <button
+              onClick={() => {
+                const action = feedback.onAction;
+                closeFeedback();
+                if (typeof action === "function") action();
+              }}
+              className={`px-6 py-2 rounded-lg text-white transition ${
+                feedback.type === "success"
+                  ? "bg-indigo-600 hover:bg-indigo-700"
+                  : "bg-slate-700 hover:bg-slate-800"
+              }`}
+            >
+              {feedback.actionText}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

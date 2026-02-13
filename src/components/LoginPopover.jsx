@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 function decodeJwtPayload(token) {
   const payloadBase64Url = token.split(".")[1];
@@ -22,44 +23,62 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "error", // success | error
+    title: "",
+    message: "",
+    actionText: "Entendi",
+  });
   const navigate = useNavigate();
+
+  const showFeedback = ({
+    type = "error",
+    title = "",
+    message = "",
+    actionText = "Entendi",
+  }) => {
+    setFeedback({
+      open: true,
+      type,
+      title,
+      message,
+      actionText,
+    });
+  };
+
+  const closeFeedback = () => {
+    setFeedback((prev) => ({ ...prev, open: false }));
+  };
+
+  useEffect(() => {
+    if (!open) {
+      closeFeedback();
+    }
+  }, [open]);
 
   if (!open) return null;
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    closeFeedback();
 
     try {
-      // chama API
-      console.log("🔐 handleLogin disparado");
       const token = await apiLogin({ email, password });
-      console.log("✅ token recebido", token);
 
       if (typeof token !== "string") {
         throw new Error("Token inválido recebido do servidor.");
       }
 
-      // salva no contexto
       login(token);
 
-      // fecha popover
       onClose?.();
 
-      // decodifica JWT
       const decoded = decodeJwtPayload(token) || {};
-      console.log("📦 decoded", decoded);
-
 
       const mustChangePassword = parseBool(decoded.mustChangePassword);
       const isAdmin = parseBool(decoded.isAdmin);
-
-      console.log("➡️ redirect decision", {
-  isAdmin,
-  mustChangePassword
-});
 
       if (mustChangePassword) {
         navigate("/change-password", { replace: true });
@@ -72,12 +91,12 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
       navigate("/dashboard", { replace: true });
 
     } catch (err) {
-      const msg =
-        err?.response?.data?.title ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Falha ao fazer login.";
-      setError(msg);
+      showFeedback({
+        type: "error",
+        title: "Não foi possível entrar",
+        message: getAuthFriendlyMessage(err, "Não foi possível concluir o login. Tente novamente."),
+        actionText: "Tentar de novo",
+      });
     } finally {
       setLoading(false);
     }
@@ -143,8 +162,6 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
           <div className="flex gap-2 mt-2">
             <button
               type="submit"
@@ -173,6 +190,44 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
           </button>
         </div>
       </div>
+
+      {feedback.open && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onClick={closeFeedback}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center mb-4">
+              <div
+                className={`w-12 h-12 flex items-center justify-center rounded-full text-xl font-bold ${
+                  feedback.type === "success"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-red-100 text-red-600"
+                }`}
+              >
+                {feedback.type === "success" ? "✓" : "!"}
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold mb-2">{feedback.title}</h2>
+            <p className="text-sm text-gray-600 mb-6">{feedback.message}</p>
+
+            <button
+              onClick={closeFeedback}
+              className={`px-6 py-2 rounded-lg text-white transition ${
+                feedback.type === "success"
+                  ? "bg-indigo-600 hover:bg-indigo-700"
+                  : "bg-slate-700 hover:bg-slate-800"
+              }`}
+            >
+              {feedback.actionText}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
