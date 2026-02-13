@@ -1,33 +1,27 @@
-# CI/CD do Frontend com GitHub Actions
+# Esteira de Deploy (Frontend) com GitHub Actions
 
-Este repositório possui pipeline em:
+Pipeline:
 
 - `.github/workflows/pipeline.yml`
 
-Fluxo:
+## O que ela faz
 
-1. Build do frontend em `push`/`pull_request` da `main`.
-2. Deploy automático na máquina self-hosted quando houver `push` na `main`.
-3. Deploy manual via `Run workflow`.
+1. `Build Frontend` em `push`/`pull_request` da `main`.
+2. Deploy automatico em `staging` no `push` da `main`.
+3. Deploy manual em `staging` ou `production` via `workflow_dispatch`.
+4. Rollback manual via `workflow_dispatch`.
 
-## Pré-requisitos
+## Environments (staging e production)
 
-Na máquina de deploy (runner self-hosted), você precisa:
+Crie no GitHub:
 
-- Runner registrado com labels:
-  - `self-hosted`
-  - `macOS`
-  - `deploy`
-- Docker + Docker Compose instalados.
-- Estrutura de diretórios:
-  - `DEPLOY_ROOT/PlanWriter`
-  - `DEPLOY_ROOT/PlanWriter-Frontend`
+- `Settings > Environments > New environment`
+- `staging`
+- `production`
 
-## Secret necessário
+Em cada ambiente, configure:
 
-No repositório `PlanWriter-Frontend`, configure:
-
-- `DEPLOY_ROOT`: pasta raiz onde estão os dois repositórios.
+- Secret `DEPLOY_ROOT`
 
 Exemplo:
 
@@ -35,14 +29,47 @@ Exemplo:
 /Users/alessandrosilveira/planwriter-deploy
 ```
 
-## O que o deploy executa
+Se quiser separar infraestrutura, use caminhos diferentes por ambiente.
 
-O job de deploy:
+## Como rodar deploy manual
 
-1. Atualiza backend e frontend (`git pull --ff-only origin main`).
-2. Roda o compose do backend:
+No workflow `PlanWriter Frontend Pipeline`, clique em `Run workflow` e escolha:
+
+- `target`: `staging` ou `production`
+- `action`: `deploy`
+- `deploy_ref` (opcional): branch/tag/SHA
+
+Se `deploy_ref` ficar vazio, usa a branch atual do run.
+
+## Como rodar rollback
+
+No workflow `PlanWriter Frontend Pipeline`:
+
+- `target`: `staging` ou `production`
+- `action`: `rollback`
+- `rollback_ref`: branch/tag/SHA para voltar
+
+Obs.: o `rollback_ref` deve existir nos dois repositórios (`PlanWriter` e `PlanWriter-Frontend`).
+
+## Branch protection (main)
+
+No GitHub:
+
+1. `Settings > Branches > Add branch protection rule`
+2. Branch name pattern: `main`
+3. Marcar `Require a pull request before merging`
+4. Marcar `Require status checks to pass before merging`
+5. Selecionar check obrigatório:
+   - `Build Frontend`
+6. Salvar
+
+Para `production`, recomenda-se também exigir aprovação no Environment `production`.
+
+
+Opcional via comando (API):
 
 ```bash
-docker compose -f "$DEPLOY_ROOT/PlanWriter/docker-compose.yml" up -d --build
-docker compose -f "$DEPLOY_ROOT/PlanWriter/docker-compose.yml" ps
+cd /Users/alessandrosilveira/Documents/Repos/PlanWriter-Frontend
+export GITHUB_TOKEN=seu_token_com_admin_repo
+./scripts/ci/apply-branch-protection.sh
 ```
