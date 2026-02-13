@@ -411,8 +411,6 @@ export default function Dashboard() {
                   data={heat.days}
                   startDate={heat.rangeStart}
                   endDate={heat.rangeEnd}
-                  size={18}
-                  gap={4}
                   stretch={false}
                   className="mx-auto block"
                 />

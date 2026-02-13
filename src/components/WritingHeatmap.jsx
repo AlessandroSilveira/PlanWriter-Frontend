@@ -116,7 +116,11 @@ export default function WritingHeatmap({
 
   const svgClassName = stretch
     ? `w-full h-auto ${className}`.trim()
-    : `max-w-full h-auto ${className}`.trim();
+    : `h-auto ${className}`.trim();
+
+  const svgStyle = stretch
+    ? undefined
+    : { width: `${W}px`, height: `${H}px`, maxWidth: "100%" };
 
   return (
     <svg
@@ -124,6 +128,8 @@ export default function WritingHeatmap({
       className={svgClassName}
       width={stretch ? undefined : W}
       height={stretch ? undefined : H}
+      style={svgStyle}
+      preserveAspectRatio="xMinYMin meet"
     >
       {[
         "S",
