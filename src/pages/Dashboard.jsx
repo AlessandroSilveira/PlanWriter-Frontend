@@ -29,6 +29,8 @@ export default function Dashboard() {
     total: 0,
     streak: 0,
     today: 0,
+    rangeStart: null,
+    rangeEnd: null,
   });
 
   const [monthly, setMonthly] = useState({ loading: true, total: 0 });
@@ -100,22 +102,42 @@ export default function Dashboard() {
     })();
   }, []);
 
-  /* ===================== HEATMAP (ANO) ===================== */
+  /* ===================== HEATMAP (MÊS ATUAL) ===================== */
   useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    monthEnd.setHours(0, 0, 0, 0);
+
+    const rangeStart = monthStart.toISOString().slice(0, 10);
+    const rangeEnd = monthEnd.toISOString().slice(0, 10);
+
+    const monthDays = [];
+    for (const d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().slice(0, 10);
+      monthDays.push({ date: key, value: 0 });
+    }
+
     if (!projects?.length) {
-      setHeat({ loading: false, days: [], total: 0, streak: 0, today: 0 });
+      setHeat({
+        loading: false,
+        days: monthDays,
+        total: 0,
+        streak: 0,
+        today: 0,
+        rangeStart,
+        rangeEnd,
+      });
       return;
     }
 
     (async () => {
-      setHeat(h => ({ ...h, loading: true }));
+      setHeat((h) => ({ ...h, loading: true, rangeStart, rangeEnd }));
       try {
-        const end = new Date();
-        end.setHours(0, 0, 0, 0);
-
-        const start = new Date(end);
-        start.setDate(end.getDate() - 370);
-
         const map = new Map();
         let total = 0;
 
@@ -125,12 +147,16 @@ export default function Dashboard() {
             try {
               const hist = await getProjectHistory(pid);
               (hist || []).forEach((h) => {
-                const d = new Date(
+                const parsed = new Date(
                   h.date || h.Date || h.createdAt || h.CreatedAt
                 );
-                if (d < start || d > end) return;
 
-                const key = d.toISOString().slice(0, 10);
+                if (Number.isNaN(parsed.getTime())) return;
+
+                parsed.setHours(0, 0, 0, 0);
+                if (parsed < monthStart || parsed > monthEnd) return;
+
+                const key = parsed.toISOString().slice(0, 10);
                 const add = Number(
                   h.wordsWritten ?? h.WordsWritten ?? h.words ?? 0
                 ) || 0;
@@ -146,36 +172,45 @@ export default function Dashboard() {
           })
         );
 
-        const weeks = 53;
-        const totalDays = weeks * 7;
-        const gridStart = new Date(end);
-        gridStart.setDate(end.getDate() - (totalDays - 1));
-
         const days = [];
-        for (let i = 0; i < totalDays; i++) {
-          const d = new Date(gridStart);
-          d.setDate(gridStart.getDate() + i);
+        for (const d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
           const key = d.toISOString().slice(0, 10);
           days.push({ date: key, value: map.get(key) || 0 });
         }
 
-        const todayKey = end.toISOString().slice(0, 10);
+        const todayKey = today.toISOString().slice(0, 10);
         let streak = 0;
-        const probe = new Date(end);
+        const probe = new Date(today);
 
-        while (true) {
-          const k = probe.toISOString().slice(0, 10);
-          const v = map.get(k) || 0;
-          if (v > 0) {
-            streak++;
-            probe.setDate(probe.getDate() - 1);
-          } else break;
+        while (probe >= monthStart) {
+          const key = probe.toISOString().slice(0, 10);
+          const value = map.get(key) || 0;
+          if (value <= 0) break;
+          streak++;
+          probe.setDate(probe.getDate() - 1);
         }
 
-        const today = map.get(todayKey) || 0;
-        setHeat({ loading: false, days, total, streak, today });
+        const todayWords = map.get(todayKey) || 0;
+
+        setHeat({
+          loading: false,
+          days,
+          total,
+          streak,
+          today: todayWords,
+          rangeStart,
+          rangeEnd,
+        });
       } catch {
-        setHeat({ loading: false, days: [], total: 0, streak: 0, today: 0 });
+        setHeat({
+          loading: false,
+          days: monthDays,
+          total: 0,
+          streak: 0,
+          today: 0,
+          rangeStart,
+          rangeEnd,
+        });
       }
     })();
   }, [projects]);
@@ -367,12 +402,16 @@ export default function Dashboard() {
         {/* HEATMAP */}
         <div className="container mt-4">
           <section className="panel">
-            <h2 className="section-title">Seu ano de escrita</h2>
+            <h2 className="section-title">Seu mês de escrita</h2>
             {heat.loading ? (
               <p className="text-sm text-muted mt-2">Carregando histórico…</p>
             ) : (
               <>
-                <WritingHeatmap data={heat.days} />
+                <WritingHeatmap
+                  data={heat.days}
+                  startDate={heat.rangeStart}
+                  endDate={heat.rangeEnd}
+                />
                 <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="kpi">
                     <div className="label">Sequência atual</div>
@@ -385,7 +424,7 @@ export default function Dashboard() {
                     <div className="hint">palavras</div>
                   </div>
                   <div className="kpi">
-                    <div className="label">Últimos 365 dias</div>
+                    <div className="label">No mês</div>
                     <div className="value">{heat.total.toLocaleString('pt-BR')}</div>
                     <div className="hint">palavras</div>
                   </div>
