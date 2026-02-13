@@ -17,6 +17,8 @@ export default function WritingHeatmap({
   track = "rgba(0,0,0,0.12)",
   startDate,
   endDate,
+  stretch = true,
+  className = "",
 }) {
   const rows = 7;
 
@@ -112,8 +114,17 @@ export default function WritingHeatmap({
     return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
+  const svgClassName = stretch
+    ? `w-full h-auto ${className}`.trim()
+    : `max-w-full h-auto ${className}`.trim();
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className={svgClassName}
+      width={stretch ? undefined : W}
+      height={stretch ? undefined : H}
+    >
       {[
         "S",
         "T",

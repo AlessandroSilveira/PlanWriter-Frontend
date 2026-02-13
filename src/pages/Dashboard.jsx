@@ -411,6 +411,10 @@ export default function Dashboard() {
                   data={heat.days}
                   startDate={heat.rangeStart}
                   endDate={heat.rangeEnd}
+                  size={18}
+                  gap={4}
+                  stretch={false}
+                  className="mx-auto block"
                 />
                 <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="kpi">
