@@ -106,6 +106,11 @@ export default function WordSprint() {
      CONTROLS
      ========================= */
   const startSprint = () => {
+    if (!selectedProjectId) {
+      window.alert("Você deve escolher um projeto.");
+      return;
+    }
+
     setBaseline(countWords(text));
     setFinished(false);
     setRunning(true);
@@ -229,7 +234,6 @@ export default function WordSprint() {
               <button
                 className="btn-primary"
                 onClick={startSprint}
-                disabled={!selectedProjectId}
               >
                 Iniciar
               </button>
