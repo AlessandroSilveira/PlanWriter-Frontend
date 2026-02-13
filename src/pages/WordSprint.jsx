@@ -39,6 +39,7 @@ export default function WordSprint() {
   const [history, setHistory] = useState(() => loadHistorySafe());
   const [flash, setFlash] = useState("");
   const [savedToProject, setSavedToProject] = useState(false);
+  const [projectRequiredModalOpen, setProjectRequiredModalOpen] = useState(false);
 
   const startedByTyping = useRef(false);
 
@@ -107,7 +108,7 @@ export default function WordSprint() {
      ========================= */
   const startSprint = () => {
     if (!selectedProjectId) {
-      window.alert("Você deve escolher um projeto.");
+      setProjectRequiredModalOpen(true);
       return;
     }
 
@@ -330,6 +331,25 @@ export default function WordSprint() {
         <h2 className="section-title">Histórico local</h2>
         <HistoryList items={history} setItems={setHistory} />
       </section>
+
+      {projectRequiredModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold mb-2">Projeto obrigatório</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Você deve escolher um projeto antes de iniciar o sprint.
+            </p>
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-2 rounded-md bg-slate-800 text-white hover:bg-slate-900"
+                onClick={() => setProjectRequiredModalOpen(false)}
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </header>
   );
