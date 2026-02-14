@@ -163,6 +163,26 @@
     }
     .proj .kicker { font: 700 15px var(--font-sans); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
     .proj .title { font: 800 25px var(--font-serif); margin-top: 10px; }
+    .proj-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .proj-check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #d7f0dc;
+      color: #1c7a2c;
+      border: 1px solid #b9e3c2;
+      font: 800 15px var(--font-sans);
+      margin-top: 10px;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"] .proj-check {
+      background: #2a4f31;
+      color: #b5f1bf;
+      border-color: #477952;
+    }
     .meta { color: var(--muted); font: 600 15px var(--font-sans); margin-top:10px;}
 
     /* Progress bar */
