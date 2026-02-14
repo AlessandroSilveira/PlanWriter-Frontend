@@ -17,7 +17,7 @@ export default function LoginModal({ open, onClose }) {
     type: "info",
     title: "",
     message: "",
-    primaryLabel: "Entendi",
+    primaryLabel: "OK",
   });
 
   // login fields

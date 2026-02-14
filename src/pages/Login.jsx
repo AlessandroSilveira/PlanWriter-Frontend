@@ -18,7 +18,7 @@ export default function Login() {
     type: "info",
     title: "",
     message: "",
-    primaryLabel: "Entendi",
+    primaryLabel: "OK",
   });
 
   const handleSubmit = async (e) => {

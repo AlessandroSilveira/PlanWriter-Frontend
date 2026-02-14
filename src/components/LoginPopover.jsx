@@ -16,7 +16,7 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
     type: "info",
     title: "",
     message: "",
-    primaryLabel: "Entendi",
+    primaryLabel: "OK",
   });
   const navigate = useNavigate();
 

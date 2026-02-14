@@ -44,7 +44,7 @@ export default function WordSprint() {
     type: "info",
     title: "",
     message: "",
-    primaryLabel: "Entendi",
+    primaryLabel: "OK",
   });
 
   const startedByTyping = useRef(false);
@@ -57,7 +57,7 @@ export default function WordSprint() {
   const pct = Math.min(100, Math.round((written / Math.max(1, goal)) * 100));
 
   const openFeedback = useCallback(
-    (type, title, message, primaryLabel = "Entendi") => {
+    (type, title, message, primaryLabel = "OK") => {
       setFeedback({
         open: true,
         type,
