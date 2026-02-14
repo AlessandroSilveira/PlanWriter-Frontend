@@ -45,7 +45,14 @@ export default function Projects() {
       <Link to={`/projects/${pid}`} className="no-underline">
         <div className={`proj ${isCompletedCard ? "proj--completed" : ""}`}>
           <div className="kicker">{p?.genre ?? "Projeto"}</div>
-          <div className="title">{p.title ?? p.name}</div>
+          <div className="proj-title-row">
+            <div className="title">{p.title ?? p.name}</div>
+            {isCompletedCard && (
+              <span className="proj-check" aria-label="Projeto concluído" title="Projeto concluído">
+                ✓
+              </span>
+            )}
+          </div>
           {p.description && <p className="meta">{p.description}</p>}
           <p className="meta">
             {(p.currentWordCount ?? 0).toLocaleString("pt-BR")} /{" "}
