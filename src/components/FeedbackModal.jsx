@@ -32,7 +32,7 @@ export default function FeedbackModal({
   type = "info",
   title,
   message,
-  primaryLabel = "Entendi",
+  primaryLabel = "OK",
   onPrimary,
   onClose,
   dismissible = true,

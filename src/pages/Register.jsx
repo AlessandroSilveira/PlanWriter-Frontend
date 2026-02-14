@@ -23,7 +23,7 @@ export default function Register() {
     type: "info",
     title: "",
     message: "",
-    primaryLabel: "Entendi",
+    primaryLabel: "OK",
     onPrimary: null,
   });
 
