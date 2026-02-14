@@ -127,8 +127,8 @@ export default function WordSprint() {
 
       openFeedback(
         "success",
-        "Progresso salvo no projeto",
-        "Sua sessão foi salva com sucesso."
+        "Progresso salvo no projeto ✅",
+        "Sua sessão foi salva com sucesso no projeto selecionado."
       );
     } catch (err) {
       console.error(err);
