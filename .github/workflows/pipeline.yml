@@ -136,42 +136,6 @@ jobs:
           checkout_ref "$BACKEND_DIR" "$TARGET_REF"
           checkout_ref "$FRONTEND_DIR" "$TARGET_REF"
 
-          cleanup_target_containers() {
-            local env_name="$1"
-            local containers=()
-
-            case "$env_name" in
-              staging)
-                containers=(
-                  "planwriter-stg-sqlserver"
-                  "planwriter-stg-sql-init"
-                  "planwriter-stg-api"
-                  "planwriter-stg-frontend"
-                )
-                ;;
-              production)
-                containers=(
-                  "planwriter-prod-sqlserver"
-                  "planwriter-prod-sql-init"
-                  "planwriter-prod-api"
-                  "planwriter-prod-frontend"
-                )
-                ;;
-            esac
-
-            # proxy pode vir de outro compose project; removemos para evitar conflito por container_name fixo.
-            containers+=("planwriter-proxy")
-
-            for container in "${containers[@]}"; do
-              if docker ps -a --format '{{.Names}}' | grep -Fxq "$container"; then
-                echo "Removendo container legado: $container"
-                docker rm -f "$container" >/dev/null || true
-              fi
-            done
-          }
-
-          cleanup_target_containers "$TARGET_ENV"
-
           bash "$BACKEND_DIR/scripts/deploy/deploy-target.sh" "$TARGET_ENV" "$BACKEND_DIR"
 
   deploy_production:
@@ -252,42 +216,6 @@ jobs:
           checkout_ref "$BACKEND_DIR" "$TARGET_REF"
           checkout_ref "$FRONTEND_DIR" "$TARGET_REF"
 
-          cleanup_target_containers() {
-            local env_name="$1"
-            local containers=()
-
-            case "$env_name" in
-              staging)
-                containers=(
-                  "planwriter-stg-sqlserver"
-                  "planwriter-stg-sql-init"
-                  "planwriter-stg-api"
-                  "planwriter-stg-frontend"
-                )
-                ;;
-              production)
-                containers=(
-                  "planwriter-prod-sqlserver"
-                  "planwriter-prod-sql-init"
-                  "planwriter-prod-api"
-                  "planwriter-prod-frontend"
-                )
-                ;;
-            esac
-
-            # proxy pode vir de outro compose project; removemos para evitar conflito por container_name fixo.
-            containers+=("planwriter-proxy")
-
-            for container in "${containers[@]}"; do
-              if docker ps -a --format '{{.Names}}' | grep -Fxq "$container"; then
-                echo "Removendo container legado: $container"
-                docker rm -f "$container" >/dev/null || true
-              fi
-            done
-          }
-
-          cleanup_target_containers "$TARGET_ENV"
-
           bash "$BACKEND_DIR/scripts/deploy/deploy-target.sh" "$TARGET_ENV" "$BACKEND_DIR"
 
   rollback:
@@ -367,40 +295,5 @@ jobs:
 
           checkout_ref "$BACKEND_DIR" "$TARGET_REF"
           checkout_ref "$FRONTEND_DIR" "$TARGET_REF"
-
-          cleanup_target_containers() {
-            local env_name="$1"
-            local containers=()
-
-            case "$env_name" in
-              staging)
-                containers=(
-                  "planwriter-stg-sqlserver"
-                  "planwriter-stg-sql-init"
-                  "planwriter-stg-api"
-                  "planwriter-stg-frontend"
-                )
-                ;;
-              production)
-                containers=(
-                  "planwriter-prod-sqlserver"
-                  "planwriter-prod-sql-init"
-                  "planwriter-prod-api"
-                  "planwriter-prod-frontend"
-                )
-                ;;
-            esac
-
-            containers+=("planwriter-proxy")
-
-            for container in "${containers[@]}"; do
-              if docker ps -a --format '{{.Names}}' | grep -Fxq "$container"; then
-                echo "Removendo container legado: $container"
-                docker rm -f "$container" >/dev/null || true
-              fi
-            done
-          }
-
-          cleanup_target_containers "$TARGET_ENV"
 
           bash "$BACKEND_DIR/scripts/deploy/deploy-target.sh" "$TARGET_ENV" "$BACKEND_DIR"
