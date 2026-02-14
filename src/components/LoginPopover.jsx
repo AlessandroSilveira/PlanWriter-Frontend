@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 function decodeJwtPayload(token) {
   const payloadBase64Url = token.split(".")[1];
@@ -40,33 +41,20 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
     setFeedback((prev) => ({ ...prev, open: false }));
 
     try {
-      // chama API
-      console.log("🔐 handleLogin disparado");
       const token = await apiLogin({ email, password });
-      console.log("✅ token recebido", token);
 
       if (typeof token !== "string") {
         throw new Error("Token inválido recebido do servidor.");
       }
 
-      // salva no contexto
       login(token);
 
-      // fecha popover
       onClose?.();
 
-      // decodifica JWT
       const decoded = decodeJwtPayload(token) || {};
-      console.log("📦 decoded", decoded);
-
 
       const mustChangePassword = parseBool(decoded.mustChangePassword);
       const isAdmin = parseBool(decoded.isAdmin);
-
-      console.log("➡️ redirect decision", {
-  isAdmin,
-  mustChangePassword
-});
 
       if (mustChangePassword) {
         navigate("/change-password", { replace: true });
@@ -79,17 +67,12 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
       navigate("/dashboard", { replace: true });
 
     } catch (err) {
-      const msg =
-        err?.response?.data?.title ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Falha ao fazer login.";
       setFeedback({
         open: true,
         type: "error",
-        title: "Falha no login",
-        message: msg,
-        primaryLabel: "Fechar",
+        title: "Não foi possível entrar",
+        message: getAuthFriendlyMessage(err, "Não foi possível concluir o login. Tente novamente."),
+        primaryLabel: "Tentar de novo",
       });
     } finally {
       setLoading(false);

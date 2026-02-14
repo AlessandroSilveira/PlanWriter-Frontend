@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
 import FeedbackModal from "../components/FeedbackModal.jsx";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -29,17 +30,12 @@ export default function Login() {
       login(token);
       navigate("/dashboard", { replace: true });
     } catch (ex) {
-      const msg =
-        ex?.response?.data?.title ||
-        ex?.response?.data?.message ||
-        ex?.message ||
-        "Falha no login";
       setFeedback({
         open: true,
         type: "error",
-        title: "Falha no login",
-        message: msg,
-        primaryLabel: "Fechar",
+        title: "Não foi possível entrar",
+        message: getAuthFriendlyMessage(ex, "Não foi possível concluir o login. Tente novamente."),
+        primaryLabel: "Tentar de novo",
       });
     } finally {
       setLoading(false);

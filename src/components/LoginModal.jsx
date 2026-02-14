@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
+import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 export default function LoginModal({ open, onClose }) {
   const { login } = useAuth();
@@ -55,9 +56,9 @@ export default function LoginModal({ open, onClose }) {
       setFeedback({
         open: true,
         type: "error",
-        title: "Falha no login",
-        message: ex?.response?.data?.message || ex?.message || "Falha no login",
-        primaryLabel: "Fechar",
+        title: "Não foi possível entrar",
+        message: getAuthFriendlyMessage(ex, "Não foi possível concluir o login. Tente novamente."),
+        primaryLabel: "Tentar de novo",
       });
     } finally {
       setLoading(false);
@@ -81,8 +82,8 @@ export default function LoginModal({ open, onClose }) {
       setFeedback({
         open: true,
         type: "success",
-        title: "Conta criada com sucesso",
-        message: "Faça login para acessar o dashboard.",
+        title: "Usuário cadastrado com sucesso",
+        message: "Faça login para entrar no dashboard.",
         primaryLabel: "Continuar",
       });
     } catch (ex) {

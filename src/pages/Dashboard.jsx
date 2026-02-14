@@ -16,6 +16,7 @@ import ProjectComparisonChart from "../components/ProjectComparisonChart";
 import WritingHeatmap from "../components/WritingHeatmap.jsx";
 import TodayTargetCard from "../components/TodayTargetCard.jsx";
 import RecentBadges from "../components/RecentBadges.jsx";
+import ProjectForm from "../components/ProjectForm.jsx";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -35,6 +36,7 @@ export default function Dashboard() {
 
   const [myEvents, setMyEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   /* ===================== LOAD PROJETOS ===================== */
   const load = async () => {
@@ -186,6 +188,13 @@ export default function Dashboard() {
   const first = projects?.[0] ?? null;
   const firstId = first?.id ?? first?.projectId ?? null;
 
+  const openNewProjectModal = () => setNewProjectOpen(true);
+  const closeNewProjectModal = () => setNewProjectOpen(false);
+  const handleProjectCreated = async () => {
+    closeNewProjectModal();
+    await load();
+  };
+
   /* ===================== META DO MÊS ===================== */
   const MONTHLY_GOAL = 50000;
   const cur = monthly.total;
@@ -239,7 +248,9 @@ export default function Dashboard() {
         <div className="container hero-inner">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold">Bem vindo de volta, Escritor.</h1>
-            <Link to="/projects/new" className="btn-primary">+ Novo projeto</Link>
+            <button type="button" className="btn-primary" onClick={openNewProjectModal}>
+              + Novo projeto
+            </button>
           </div>
 
           {error && <p className="text-red-600 mt-2">{error}</p>}
@@ -283,7 +294,9 @@ export default function Dashboard() {
             {!projects.length ? (
               <div className="card card--lg text-center py-10 mt-3">
                 <p className="meta">Você ainda não tem projetos.</p>
-                <Link to="/projects/new" className="button">Criar primeiro projeto</Link>
+                <button type="button" className="button" onClick={openNewProjectModal}>
+                  Criar primeiro projeto
+                </button>
               </div>
             ) : (
               <div className="proj-grid">
@@ -412,6 +425,36 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {newProjectOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={closeNewProjectModal}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Novo Projeto</h2>
+              <button
+                type="button"
+                className="button"
+                onClick={closeNewProjectModal}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <ProjectForm
+              onCreated={handleProjectCreated}
+              onCancel={closeNewProjectModal}
+              showCancel
+            />
+          </div>
+        </div>
+      )}
 
       <footer className="p-4 text-center text-sm text-gray-500">
         © 2025 PlanWriter — escreva com conforto
