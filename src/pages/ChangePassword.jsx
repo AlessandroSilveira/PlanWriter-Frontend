@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/http";
+import { resolvePostAuthPath } from "../utils/authRedirect";
 
 export default function ChangePassword() {
   const { login } = useAuth();
@@ -35,8 +36,7 @@ export default function ChangePassword() {
 
       login(data.token);
 
-      // após trocar senha → volta ao início
-      navigate("/", { replace: true });
+      navigate(resolvePostAuthPath(data.token, "/dashboard"), { replace: true });
     } catch (err) {
       setError(
         err?.response?.data?.message ||

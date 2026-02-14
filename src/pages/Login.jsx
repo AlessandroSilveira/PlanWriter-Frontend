@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { loginApi } from "../api/auth";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
+import { resolvePostAuthPath } from "../utils/authRedirect";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export default function Login() {
       const token = await loginApi({ email, password });
       if (!token) throw new Error("Token não retornado pelo backend");
       login(token);
-      navigate("/dashboard", { replace: true });
+      navigate(resolvePostAuthPath(token, "/dashboard"), { replace: true });
     } catch (ex) {
       setFeedback({
         open: true,
