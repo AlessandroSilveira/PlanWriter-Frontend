@@ -153,6 +153,14 @@
       background: var(--panel); border: 1px solid var(--line);
       border-radius: var(--radius-sm); padding: 14px; box-shadow: var(--shadow-sm);
     }
+    .proj--completed {
+      background: #edf8ee;
+      border-color: #cfe5d3;
+    }
+    [data-theme="dark"] .proj--completed {
+      background: #243227;
+      border-color: #3f5b44;
+    }
     .proj .kicker { font: 700 15px var(--font-sans); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
     .proj .title { font: 800 25px var(--font-serif); margin-top: 10px; }
     .meta { color: var(--muted); font: 600 15px var(--font-sans); margin-top:10px;}
@@ -393,4 +401,3 @@
 .segmented { display:inline-flex; background:var(--seg-bg, rgba(0,0,0,.06)); border-radius:999px; padding:4px; }
 .segmented-item { padding:6px 10px; border-radius:999px; font-size:.875rem; }
 .segmented-item.active { background:var(--accent, #0f3a5f); color:white; }
-
