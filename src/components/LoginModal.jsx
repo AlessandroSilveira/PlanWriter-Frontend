@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 
 export default function LoginModal({ open, onClose }) {
@@ -12,11 +13,10 @@ export default function LoginModal({ open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({
     open: false,
-    type: "success", // success | error
+    type: "info",
     title: "",
     message: "",
-    actionText: "Fechar",
-    onAction: null,
+    primaryLabel: "Entendi",
   });
 
   // login fields
@@ -28,32 +28,11 @@ export default function LoginModal({ open, onClose }) {
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
 
-  const showFeedback = ({
-    type = "success",
-    title = "",
-    message = "",
-    actionText = "Fechar",
-    onAction = null,
-  }) => {
-    setFeedback({
-      open: true,
-      type,
-      title,
-      message,
-      actionText,
-      onAction,
-    });
-  };
-
-  const closeFeedback = () => {
-    setFeedback((prev) => ({ ...prev, open: false, onAction: null }));
-  };
-
   useEffect(() => {
     if (!open) return;
     setLoading(false);
     setMode("login");
-    closeFeedback();
+    setFeedback((prev) => ({ ...prev, open: false }));
   }, [open]);
 
   useEffect(() => {
@@ -74,10 +53,12 @@ export default function LoginModal({ open, onClose }) {
       onClose?.();
       navigate("/dashboard");
     } catch (ex) {
-      showFeedback({
+      setFeedback({
+        open: true,
         type: "error",
         title: "Não foi possível entrar",
         message: getAuthFriendlyMessage(ex, "Não foi possível concluir o login. Tente novamente."),
+        primaryLabel: "Tentar de novo",
       });
     } finally {
       setLoading(false);
@@ -96,21 +77,22 @@ export default function LoginModal({ open, onClose }) {
         password,
       });
 
+      // após registro, já volta para login
       setMode("login");
-      showFeedback({
+      setFeedback({
+        open: true,
         type: "success",
         title: "Usuário cadastrado com sucesso",
-        message: "Faça o login para entrar no dashboard.",
-        actionText: "Ir para login",
+        message: "Faça login para entrar no dashboard.",
+        primaryLabel: "Continuar",
       });
     } catch (ex) {
-      showFeedback({
+      setFeedback({
+        open: true,
         type: "error",
         title: "Falha no cadastro",
-        message:
-          ex?.response?.data?.message ||
-          ex?.message ||
-          "Falha no cadastro",
+        message: ex?.response?.data?.message || ex?.message || "Falha no cadastro",
+        primaryLabel: "Fechar",
       });
     } finally {
       setLoading(false);
@@ -260,42 +242,14 @@ export default function LoginModal({ open, onClose }) {
           </form>
         )}
       </div>
-
-      {feedback.open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center">
-            <div className="flex justify-center mb-4">
-              <div
-                className={`w-12 h-12 flex items-center justify-center rounded-full text-xl font-bold ${
-                  feedback.type === "success"
-                    ? "bg-green-100 text-green-600"
-                    : "bg-red-100 text-red-600"
-                }`}
-              >
-                {feedback.type === "success" ? "✓" : "!"}
-              </div>
-            </div>
-
-            <h2 className="text-lg font-semibold mb-2">{feedback.title}</h2>
-            <p className="text-sm text-gray-600 mb-6">{feedback.message}</p>
-
-            <button
-              onClick={() => {
-                const action = feedback.onAction;
-                closeFeedback();
-                if (typeof action === "function") action();
-              }}
-              className={`px-6 py-2 rounded-lg text-white transition ${
-                feedback.type === "success"
-                  ? "bg-indigo-600 hover:bg-indigo-700"
-                  : "bg-slate-700 hover:bg-slate-800"
-              }`}
-            >
-              {feedback.actionText}
-            </button>
-          </div>
-        </div>
-      )}
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

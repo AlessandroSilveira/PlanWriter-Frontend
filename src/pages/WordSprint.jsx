@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SprintTimer from "../components/SprintTimer.jsx";
+import FeedbackModal from "../components/FeedbackModal.jsx";
 import { saveSprintProgress } from "../api/progress";
 import { getProjects } from "../api/projects";
 
@@ -37,9 +38,14 @@ export default function WordSprint() {
 
   const [timerKey, setTimerKey] = useState(0);
   const [history, setHistory] = useState(() => loadHistorySafe());
-  const [flash, setFlash] = useState("");
   const [savedToProject, setSavedToProject] = useState(false);
-  const [projectRequiredModalOpen, setProjectRequiredModalOpen] = useState(false);
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "Entendi",
+  });
 
   const startedByTyping = useRef(false);
 
@@ -50,14 +56,27 @@ export default function WordSprint() {
   const written = Math.max(0, words - baseline);
   const pct = Math.min(100, Math.round((written / Math.max(1, goal)) * 100));
 
+  const openFeedback = useCallback(
+    (type, title, message, primaryLabel = "Entendi") => {
+      setFeedback({
+        open: true,
+        type,
+        title,
+        message,
+        primaryLabel,
+      });
+    },
+    []
+  );
+
   /* =========================
      TIMER FINISH (VISUAL ONLY)
      ========================= */
   const handleFinish = useCallback(() => {
     setRunning(false);
     setFinished(true);
-    setFlash("Sprint finalizado!");
-  }, []);
+    openFeedback("success", "Sprint finalizado", "Bom trabalho, sessão concluída.");
+  }, [openFeedback]);
 
   const finishSprintEarly = () => {
     if (finished || !startedByTyping.current) return;
@@ -65,7 +84,11 @@ export default function WordSprint() {
     setRunning(false);
     setFinished(true);
     setSavedToProject(false);
-    setFlash("Sprint concluído antes do tempo ✅");
+    openFeedback(
+      "success",
+      "Sprint concluído antes do tempo",
+      "Você encerrou o sprint manualmente."
+    );
   };
 
   /* =========================
@@ -73,19 +96,26 @@ export default function WordSprint() {
      ========================= */
   const handleSaveToProject = async () => {
     if (!selectedProjectId) {
-      setFlash("Selecione um projeto para salvar o progresso");
+      openFeedback(
+        "warning",
+        "Projeto obrigatório",
+        "Selecione um projeto para salvar o progresso."
+      );
       return;
     }
 
     if (written <= 0) {
-      setFlash("Nenhuma palavra escrita para salvar");
+      openFeedback(
+        "warning",
+        "Nada para salvar",
+        "Nenhuma palavra foi escrita nesta sessão."
+      );
       return;
     }
 
     if (savedToProject) return;
 
     setSavedToProject(true);
-    setFlash("Salvando progresso no projeto...");
 
     try {
       await saveSprintProgress({
@@ -95,11 +125,19 @@ export default function WordSprint() {
         date: new Date().toISOString(),
       });
 
-      setFlash("Progresso salvo no projeto ✅");
+      openFeedback(
+        "success",
+        "Progresso salvo no projeto",
+        "Sua sessão foi salva com sucesso."
+      );
     } catch (err) {
       console.error(err);
       setSavedToProject(false);
-      setFlash("Erro ao salvar progresso 😕");
+      openFeedback(
+        "error",
+        "Erro ao salvar progresso",
+        "Não foi possível salvar o progresso no projeto."
+      );
     }
   };
 
@@ -108,7 +146,11 @@ export default function WordSprint() {
      ========================= */
   const startSprint = () => {
     if (!selectedProjectId) {
-      setProjectRequiredModalOpen(true);
+      openFeedback(
+        "warning",
+        "Projeto obrigatório",
+        "Você deve escolher um projeto antes de iniciar o sprint."
+      );
       return;
     }
 
@@ -156,7 +198,11 @@ export default function WordSprint() {
     const updated = [entry, ...history].slice(0, HISTORY_LIMIT);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
     setHistory(updated);
-    setFlash("Sprint salvo localmente ✅");
+    openFeedback(
+      "success",
+      "Sprint salvo localmente",
+      "O histórico da sessão foi salvo no seu navegador."
+    );
   };
 
   /* =========================
@@ -323,7 +369,6 @@ export default function WordSprint() {
           )}
         </div>
 
-        {flash && <p className="mt-2 text-sm text-green-600">{flash}</p>}
       </section>
 
       {/* Histórico */}
@@ -332,24 +377,14 @@ export default function WordSprint() {
         <HistoryList items={history} setItems={setHistory} />
       </section>
 
-      {projectRequiredModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold mb-2">Projeto obrigatório</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Você deve escolher um projeto antes de iniciar o sprint.
-            </p>
-            <div className="flex justify-end">
-              <button
-                className="px-4 py-2 rounded-md bg-slate-800 text-white hover:bg-slate-900"
-                onClick={() => setProjectRequiredModalOpen(false)}
-              >
-                Entendi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
+      />
     </div>
     </header>
   );
