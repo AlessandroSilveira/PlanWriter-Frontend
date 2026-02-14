@@ -85,31 +85,34 @@ export default function Navbar() {
         {isAuthenticated && (
           <div className="flex items-center gap-3 min-w-0">
             <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
-              <NavLink to="/dashboard" className={navLink}>
-                Dashboard
-              </NavLink>
-              <NavLink to="/projects" className={navLink}>
-                Projetos
-              </NavLink>
-              <NavLink to="/sprint" className={navLink}>
-                Sprint
-              </NavLink>
-              <NavLink to="/diary" className={navLink}>
-                Diário
-              </NavLink>
-              <NavLink to="/events" className={navLink}>
-                Eventos
-              </NavLink>
-              <NavLink to="/buddies" className={navLink}>
-                Buddies
-              </NavLink>
-              <NavLink to="/me" className={navLink}>
-                Perfil
-              </NavLink>
-              {user?.isAdmin && (
+              {user?.isAdmin ? (
                 <NavLink to="/admin/events" className={navLink}>
                   Admin
                 </NavLink>
+              ) : (
+                <>
+                  <NavLink to="/dashboard" className={navLink}>
+                    Dashboard
+                  </NavLink>
+                  <NavLink to="/projects" className={navLink}>
+                    Projetos
+                  </NavLink>
+                  <NavLink to="/sprint" className={navLink}>
+                    Sprint
+                  </NavLink>
+                  <NavLink to="/diary" className={navLink}>
+                    Diário
+                  </NavLink>
+                  <NavLink to="/events" className={navLink}>
+                    Eventos
+                  </NavLink>
+                  <NavLink to="/buddies" className={navLink}>
+                    Buddies
+                  </NavLink>
+                  <NavLink to="/me" className={navLink}>
+                    Perfil
+                  </NavLink>
+                </>
               )}
             </nav>
 

@@ -4,20 +4,7 @@ import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
-
-function decodeJwtPayload(token) {
-  const payloadBase64Url = token.split(".")[1];
-  if (!payloadBase64Url) return null;
-  const base64 = payloadBase64Url.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-  return JSON.parse(atob(padded));
-}
-
-function parseBool(value) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.toLowerCase() === "true";
-  return false;
-}
+import { resolvePostAuthPath } from "../utils/authRedirect";
 
 export default function LoginPopover({ open, anchorEl, onClose }) {
   const { login } = useAuth();
@@ -50,21 +37,7 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
       login(token);
 
       onClose?.();
-
-      const decoded = decodeJwtPayload(token) || {};
-
-      const mustChangePassword = parseBool(decoded.mustChangePassword);
-      const isAdmin = parseBool(decoded.isAdmin);
-
-      if (mustChangePassword) {
-        navigate("/change-password", { replace: true });
-        return;
-      }
-      if (isAdmin) {
-        navigate("/admin/events", { replace: true });
-        return;
-      }
-      navigate("/dashboard", { replace: true });
+      navigate(resolvePostAuthPath(token, "/dashboard"), { replace: true });
 
     } catch (err) {
       setFeedback({

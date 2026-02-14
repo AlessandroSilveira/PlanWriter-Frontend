@@ -4,6 +4,7 @@ import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
+import { resolvePostAuthPath } from "../utils/authRedirect";
 
 export default function LoginModal({ open, onClose }) {
   const { login } = useAuth();
@@ -51,7 +52,7 @@ export default function LoginModal({ open, onClose }) {
       if (!token) throw new Error("Token não retornado pelo servidor.");
       login(token);
       onClose?.();
-      navigate("/dashboard");
+      navigate(resolvePostAuthPath(token, "/dashboard"), { replace: true });
     } catch (ex) {
       setFeedback({
         open: true,

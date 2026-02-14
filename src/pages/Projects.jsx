@@ -34,15 +34,16 @@ export default function Projects() {
   const active = projects.filter(isOngoing);
   const completed = projects.filter(p => !isOngoing(p));
 
-  const ProjectCard = ({ p }) => {
+  const ProjectCard = ({ p, variant = "active" }) => {
     const pid = p.id ?? p.projectId;
+    const isCompletedCard = variant === "completed";
     const pct = Math.min(
       100,
       Math.round(p?.progressPercent ?? ((p?.currentWordCount ?? 0) / (p?.wordCountGoal || 1)) * 100)
     );
     return (
       <Link to={`/projects/${pid}`} className="no-underline">
-        <div className="proj">
+        <div className={`proj ${isCompletedCard ? "proj--completed" : ""}`}>
           <div className="kicker">{p?.genre ?? "Projeto"}</div>
           <div className="title">{p.title ?? p.name}</div>
           {p.description && <p className="meta">{p.description}</p>}
@@ -95,7 +96,7 @@ export default function Projects() {
             ) : (
               <div className="proj-grid">
                 {completed.map(p => (
-                  <ProjectCard key={p.id ?? p.projectId} p={p} />
+                  <ProjectCard key={p.id ?? p.projectId} p={p} variant="completed" />
                 ))}
               </div>
             )}

@@ -17,6 +17,7 @@ import WritingHeatmap from "../components/WritingHeatmap.jsx";
 import TodayTargetCard from "../components/TodayTargetCard.jsx";
 import RecentBadges from "../components/RecentBadges.jsx";
 import ProjectForm from "../components/ProjectForm.jsx";
+import { isOngoing } from "../utils/overviewAggregation";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -194,6 +195,7 @@ export default function Dashboard() {
     closeNewProjectModal();
     await load();
   };
+  const activeProjects = projects.filter(isOngoing);
 
   /* ===================== META DO MÊS ===================== */
   const MONTHLY_GOAL = 50000;
@@ -291,16 +293,20 @@ export default function Dashboard() {
         <div className="container grid">
           <section className="panel">
             <h2>Seus projetos</h2>
-            {!projects.length ? (
+            {!activeProjects.length ? (
               <div className="card card--lg text-center py-10 mt-3">
-                <p className="meta">Você ainda não tem projetos.</p>
+                <p className="meta">
+                  {projects.length
+                    ? "Você não tem projetos em andamento."
+                    : "Você ainda não tem projetos."}
+                </p>
                 <button type="button" className="button" onClick={openNewProjectModal}>
                   Criar primeiro projeto
                 </button>
               </div>
             ) : (
               <div className="proj-grid">
-                {projects.map(p => {
+                {activeProjects.map(p => {
                   const pid = p.id ?? p.projectId;
                   const pCur = Number(p.currentWordCount ?? 0);
                   const pGoal = Number(p.wordCountGoal ?? 0);
