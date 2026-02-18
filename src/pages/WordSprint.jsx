@@ -3,6 +3,8 @@ import SprintTimer from "../components/SprintTimer.jsx";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import { saveSprintProgress } from "../api/progress";
 import { getProjects } from "../api/projects";
+import { isOngoing } from "../utils/overviewAggregation";
+
 
 /* util simples de contagem de palavras */
 function countWords(text) {
@@ -212,7 +214,14 @@ export default function WordSprint() {
     async function loadProjects() {
       try {
         const data = await getProjects();
-        setProjects(data);
+        const allProjects = Array.isArray(data) ? data : [];
+        const activeProjects = allProjects.filter(isOngoing);
+        setProjects(activeProjects);
+        setSelectedProjectId((current) =>
+          activeProjects.some((p) => String(p.id ?? p.projectId) === String(current))
+            ? current
+            : ""
+        );
       } catch (error) {
         console.error("Erro ao carregar projetos:", error);
       }
@@ -238,11 +247,14 @@ export default function WordSprint() {
           disabled={running}
         >
           <option value="">Selecione um projeto</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
+          {projects.map((p) => {
+            const pid = String(p.id ?? p.projectId);
+            return (
+              <option key={pid} value={pid}>
+              {p.title ?? p.name ?? "Projeto sem título"}
+              </option>
+            );
+          })}            
         </select>
       </label>
 
