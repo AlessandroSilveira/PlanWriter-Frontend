@@ -15,6 +15,7 @@ import Projects from "./pages/Projects.jsx";
 import NewProject from "./pages/NewProject.jsx";
 import ProjectDetails from "./pages/ProjectDetails.jsx";
 import WritingDiary from "./pages/WritingDiary.jsx";
+import Reports from "./pages/Reports.jsx";
 import Buddies from "./pages/Buddies.jsx";
 import Events from "./pages/Events.jsx";
 import EventDetails from "./pages/EventDetails.jsx";
@@ -139,6 +140,17 @@ export default function App() {
             <ProtectedRoute>
               <RequirePasswordChange>
                 <WritingDiary />
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <Reports />
               </RequirePasswordChange>
             </ProtectedRoute>
           }
