@@ -91,6 +91,26 @@ export async function getEventById(id) {
   return data;
 }
 
+export async function getEventGoodies(eventId, projectId) {
+  if (!eventId || !projectId) {
+    throw new Error("eventId e projectId são obrigatórios.");
+  }
+
+  const { data } = await api.get(`/events/${eventId}/projects/${projectId}/goodies`);
+  return data;
+}
+
+export async function downloadEventCertificate(eventId, projectId) {
+  if (!eventId || !projectId) {
+    throw new Error("eventId e projectId são obrigatórios.");
+  }
+
+  const response = await api.get(`/events/${eventId}/projects/${projectId}/certificate`, {
+    responseType: "blob",
+  });
+  return response?.data;
+}
+
 /**
  * Preview de validação
  */
