@@ -368,7 +368,9 @@ export default function Dashboard() {
                 {myEvents.map((ev) => (
                   <EventProgressCard
                     key={ev.eventId ?? ev.id}
+                    eventId={ev.eventId ?? ev.id}
                     projectId={ev.projectId ?? ev.project?.id}
+                    projectTitle={ev.projectTitle ?? ev.project?.title}
                   />
                 ))}
               </div>
