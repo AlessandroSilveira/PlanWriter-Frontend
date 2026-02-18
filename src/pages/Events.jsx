@@ -4,17 +4,43 @@ import { getProjects } from "../api/projects";
 import { getActiveEvents, getMyEvents, joinEvent } from "../api/events";
 import JoinEventModal from "../components/JoinEventModal";
 import FeedbackModal from "../components/FeedbackModal.jsx";
+import {
+  normalizeEntityId,
+  normalizeMyEventProgress,
+  resolveTargetWords,
+} from "../utils/eventProgress";
 
 function getApiErrorMessage(error) {
+  const fallback = "Não foi possível concluir sua participação agora. Tente novamente.";
+  const status = Number(error?.response?.status ?? 0);
+  if (status === 400) return fallback;
+  if (status === 401) return "Sua sessão expirou. Faça login novamente.";
+  if (status === 403) return "Você não tem permissão para participar deste evento.";
+  if (status === 404) return "Evento ou projeto não encontrado.";
+  if (status >= 500) return "Estamos com instabilidade no servidor. Tente novamente em instantes.";
+
   const data = error?.response?.data;
+  const isTechnical = (value) =>
+    /system\.|exception|stack trace|nullable object|materialization|sql|guid|invalidoperationexception|keynotfoundexception|request failed with status code/i.test(
+      String(value ?? "")
+    );
 
   if (typeof data === "string" && data.trim().length > 0) {
-    return data;
+    return isTechnical(data) ? fallback : data;
   }
 
-  if (data?.message) return data.message;
-  if (data?.title) return data.title;
-  return error?.message || "Não foi possível concluir sua participação.";
+  if (data?.message) {
+    return isTechnical(data.message) ? fallback : data.message;
+  }
+  if (data?.title) {
+    return isTechnical(data.title) ? fallback : data.title;
+  }
+
+  if (error?.message) {
+    return isTechnical(error.message) ? fallback : error.message;
+  }
+
+  return fallback;
 }
 
 export default function Events() {
@@ -39,9 +65,30 @@ export default function Events() {
     onPrimary: null,
   });
 
+  const activeEventsById = useMemo(() => {
+    const map = new Map();
+    for (const eventItem of activeEvents) {
+      const key = normalizeEntityId(eventItem?.id ?? eventItem?.Id);
+      if (!key) continue;
+      map.set(key, eventItem);
+    }
+    return map;
+  }, [activeEvents]);
+
+  const normalizedMyEvents = useMemo(() => {
+    return myEvents
+      .map((entry) => {
+        const eventIdKey = normalizeEntityId(entry?.eventId ?? entry?.EventId ?? entry?.id ?? entry?.Id);
+        const activeEvent = activeEventsById.get(eventIdKey);
+        const fallbackTargetWords = activeEvent?.defaultTargetWords ?? activeEvent?.DefaultTargetWords;
+        return normalizeMyEventProgress(entry, { fallbackTargetWords });
+      })
+      .filter((entry) => Boolean(entry.eventId));
+  }, [myEvents, activeEventsById]);
+
   const myEventIds = useMemo(
-    () => new Set(myEvents.map((entry) => entry.eventId)),
-    [myEvents]
+    () => new Set(normalizedMyEvents.map((entry) => normalizeEntityId(entry.eventId))),
+    [normalizedMyEvents]
   );
 
   useEffect(() => {
@@ -111,7 +158,7 @@ export default function Events() {
       setJoining(true);
 
       await joinEvent({
-        eventId: joinModalEvent.id,
+        eventId: joinModalEvent.id ?? joinModalEvent.Id,
         projectId,
       });
 
@@ -123,10 +170,10 @@ export default function Events() {
         open: true,
         type: "success",
         title: "Participação confirmada",
-        message: `Você entrou no evento "${joinModalEvent.name}".`,
+        message: `Você entrou no evento "${joinModalEvent.name ?? joinModalEvent.Name}".`,
         primaryLabel: "Ver detalhes",
         onPrimary: () => {
-          const targetEventId = joinModalEvent.id;
+          const targetEventId = joinModalEvent.id ?? joinModalEvent.Id;
           setFeedback((prev) => ({ ...prev, open: false }));
           navigate(`/events/${targetEventId}`);
         },
@@ -164,27 +211,33 @@ export default function Events() {
             <div className="space-y-4">
               {activeEvents.map((ev) => (
                 <div
-                  key={ev.id}
+                  key={ev.id ?? ev.Id}
                   className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6 flex justify-between items-center"
                 >
                   <div>
                     <p className="text-sm uppercase tracking-wide text-gray-500 mb-1">Evento</p>
 
-                    <h3 className="text-xl font-serif font-semibold">{ev.name}</h3>
+                    <h3 className="text-xl font-serif font-semibold">{ev.name ?? ev.Name}</h3>
 
                     <p className="text-sm text-gray-600 mt-1">
                       {formatDate(ev.startsAtUtc)} → {formatDate(ev.endsAtUtc)}
                     </p>
 
                     <p className="text-sm text-gray-500 mt-1">
-                      Meta: {ev.defaultTargetWords} palavras
+                      Meta:{" "}
+                      {resolveTargetWords(
+                        ev.defaultTargetWords ?? ev.DefaultTargetWords,
+                        null,
+                        null
+                      ).toLocaleString("pt-BR")}{" "}
+                      palavras
                     </p>
                   </div>
 
-                  {myEventIds.has(ev.id) ? (
+                  {myEventIds.has(normalizeEntityId(ev.id ?? ev.Id)) ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/events/${ev.id}`)}
+                      onClick={() => navigate(`/events/${ev.id ?? ev.Id}`)}
                       className="px-5 py-2 border rounded-lg"
                     >
                       Detalhes
@@ -209,33 +262,37 @@ export default function Events() {
         <section>
           <h2 className="text-2xl font-serif font-semibold mb-4">Meus eventos</h2>
 
-          {myEvents.length === 0 ? (
+          {normalizedMyEvents.length === 0 ? (
             <p className="text-sm text-gray-500">Você ainda não participa de nenhum evento.</p>
           ) : (
             <div className="space-y-4">
-              {myEvents.map((ev) => (
+              {normalizedMyEvents.map((ev) => (
                 <div
-                  key={ev.eventId}
+                  key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
                   className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6 shadow-sm"
                 >
                   <p className="text-sm uppercase tracking-wide text-gray-500 mb-1">Evento</p>
 
                   <h3 className="text-2xl font-serif font-semibold">{ev.eventName}</h3>
 
-                  <p className="text-sm text-gray-600 mb-3">
-                    Projeto: {ev.projectTitle ?? "Participação individual"}
+                  <p className="text-sm text-gray-600">
+                    Projeto: {ev.projectTitle}
+                  </p>
+
+                  <p className="text-sm text-gray-700 mb-2">
+                    {ev.totalWrittenInEvent.toLocaleString("pt-BR")} / {ev.targetWords.toLocaleString("pt-BR")} palavras
                   </p>
 
                   <div className="h-2 bg-[#e6dccb] rounded-full overflow-hidden mb-3">
                     <div
                       className="h-2 bg-[#8b6b4f]"
-                      style={{ width: `${Math.min(ev.percent, 100)}%` }}
+                      style={{ width: `${ev.percent}%` }}
                     />
                   </div>
 
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">
-                      {Math.min(ev.percent, 100)}% concluído
+                      {ev.percent}% concluído
                     </span>
 
                     <button

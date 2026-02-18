@@ -4,6 +4,7 @@ import {
   getMyEvents,
   getEventProjectProgress,
 } from "../api/events";
+import { normalizeEventProjectProgress } from "../utils/eventProgress";
 
 export default function EventProgressCard({ eventId, projectId }) {
   const [loading, setLoading] = useState(true);
@@ -86,14 +87,12 @@ export default function EventProgressCard({ eventId, projectId }) {
 
   if (!progress) return null;
 
-  // 🔥 CAMPOS REAIS DO BACKEND
-  const eventName = progress.name ?? "Evento";
-  const current = Number(progress.totalWrittenInEvent ?? 0);
-  const target = Math.max(1, Number(progress.targetWords ?? 1));
-  const percent =
-    progress.percent != null
-      ? Math.min(100, Math.round(progress.percent))
-      : Math.min(100, Math.round((current / target) * 100));
+  const normalizedProgress = normalizeEventProjectProgress(progress);
+  const eventName = normalizedProgress.eventName;
+  const current = normalizedProgress.totalWrittenInEvent;
+  const target = normalizedProgress.targetWords;
+  const percent = normalizedProgress.percent;
+  const remaining = normalizedProgress.remainingWords;
 
   return (
     <div className="card">
@@ -113,9 +112,7 @@ export default function EventProgressCard({ eventId, projectId }) {
 
       <div className="flex justify-between text-sm text-muted">
         <span>{percent}% concluído</span>
-        {progress.daysLeft != null && (
-          <span>{progress.daysLeft} dias restantes</span>
-        )}
+        {remaining > 0 ? <span>{remaining.toLocaleString("pt-BR")} restantes</span> : <span>Meta concluída</span>}
       </div>
     </div>
   );
