@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getEventById,
@@ -9,6 +9,7 @@ import {
 } from "../api/events";
 import { useAuth } from "../context/AuthContext";
 import WordWarPanel from "../components/WordWarPanel.jsx";
+import { normalizeEventProjectProgress } from "../utils/eventProgress";
 
 export default function EventDetails() {
   const { user } = useAuth();
@@ -26,8 +27,18 @@ export default function EventDetails() {
   const formatDate = (value) =>
     value ? new Date(value).toLocaleDateString("pt-BR") : "—";
 
-  const percent = progress?.percent ?? 0;
-  const isCompleted = progress?.percent >= 100;
+  const normalizedProgress = useMemo(
+    () =>
+      progress
+        ? normalizeEventProjectProgress(progress, {
+            fallbackTargetWords: event?.defaultTargetWords,
+          })
+        : null,
+    [progress, event?.defaultTargetWords]
+  );
+
+  const percent = normalizedProgress?.percent ?? 0;
+  const isCompleted = normalizedProgress?.won ?? false;
 
   useEffect(() => {
     let mounted = true;
@@ -139,10 +150,11 @@ export default function EventDetails() {
             <p className="text-sm text-gray-500">
               Você ainda não participa deste evento.
             </p>
-          ) : progress ? (
+          ) : normalizedProgress ? (
             <>
               <p className="mb-2 text-sm">
-                {progress.totalWrittenInEvent} / {progress.targetWords} palavras
+                {normalizedProgress.totalWrittenInEvent.toLocaleString("pt-BR")} /{" "}
+                {normalizedProgress.targetWords.toLocaleString("pt-BR")} palavras
               </p>
 
               <div className="h-2 bg-[#e6dccb] rounded-full overflow-hidden mb-3">
@@ -155,7 +167,7 @@ export default function EventDetails() {
               <p className="text-sm text-gray-600">
                 {isCompleted
                   ? "Meta concluída 🎉"
-                  : `${progress.percent}% concluído • ${progress.remaining} palavras restantes`}
+                  : `${percent}% concluído • ${normalizedProgress.remainingWords.toLocaleString("pt-BR")} palavras restantes`}
               </p>
             </>
           ) : (
