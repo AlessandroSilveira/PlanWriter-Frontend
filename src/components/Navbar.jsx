@@ -103,6 +103,9 @@ export default function Navbar() {
                   <NavLink to="/diary" className={navLink}>
                     Diário
                   </NavLink>
+                  <NavLink to="/reports" className={navLink}>
+                    Relatórios
+                  </NavLink>
                   <NavLink to="/events" className={navLink}>
                     Eventos
                   </NavLink>
