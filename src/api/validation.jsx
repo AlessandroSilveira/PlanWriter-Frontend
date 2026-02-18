@@ -10,3 +10,10 @@ export async function previewValidation(eventId, projectId) {
 export async function submitValidation(eventId, projectId, words, source = "manual") {
   await api.post(`/events/${eventId}/validate`, { projectId, words, source });
 }
+
+export async function getValidationStatus(eventId, projectId) {
+  const { data } = await api.get(`/events/${eventId}/validate/status`, {
+    params: { projectId },
+  });
+  return data;
+}
