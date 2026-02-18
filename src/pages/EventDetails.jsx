@@ -9,6 +9,7 @@ import {
 } from "../api/events";
 import { useAuth } from "../context/AuthContext";
 import WordWarPanel from "../components/WordWarPanel.jsx";
+import EventProgressStatusCard from "../components/EventProgressStatusCard.jsx";
 import { normalizeEventProjectProgress } from "../utils/eventProgress";
 
 export default function EventDetails() {
@@ -143,7 +144,7 @@ export default function EventDetails() {
 
         <WordWarPanel eventId={eventId} eventName={event.name} />
 
-        <div className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6">
+        <section>
           <h2 className="text-xl font-serif font-semibold mb-3">Seu progresso</h2>
 
           {!myEvent ? (
@@ -151,29 +152,19 @@ export default function EventDetails() {
               Você ainda não participa deste evento.
             </p>
           ) : normalizedProgress ? (
-            <>
-              <p className="mb-2 text-sm">
-                {normalizedProgress.totalWrittenInEvent.toLocaleString("pt-BR")} /{" "}
-                {normalizedProgress.targetWords.toLocaleString("pt-BR")} palavras
-              </p>
-
-              <div className="h-2 bg-[#e6dccb] rounded-full overflow-hidden mb-3">
-                <div
-                  className="h-2 bg-[#8b6b4f]"
-                  style={{ width: `${Math.min(percent, 100)}%` }}
-                />
-              </div>
-
-              <p className="text-sm text-gray-600">
-                {isCompleted
-                  ? "Meta concluída 🎉"
-                  : `${percent}% concluído • ${normalizedProgress.remainingWords.toLocaleString("pt-BR")} palavras restantes`}
-              </p>
-            </>
+            <EventProgressStatusCard
+              eventName={event.name}
+              projectTitle={myEvent.projectTitle}
+              totalWords={normalizedProgress.totalWrittenInEvent}
+              targetWords={normalizedProgress.targetWords}
+              percent={percent}
+              remainingWords={normalizedProgress.remainingWords}
+              won={isCompleted}
+            />
           ) : (
             <p className="text-sm text-gray-500">Nenhum progresso ainda.</p>
           )}
-        </div>
+        </section>
 
         <div className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6">
           <h2 className="text-xl font-serif font-semibold mb-4">Leaderboard</h2>

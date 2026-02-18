@@ -1,15 +1,28 @@
 // src/components/EventProgressCard.jsx
+import { useMemo } from "react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getMyEvents,
   getEventProjectProgress,
 } from "../api/events";
-import { normalizeEventProjectProgress } from "../utils/eventProgress";
+import {
+  normalizeEntityId,
+  normalizeEventProjectProgress,
+} from "../utils/eventProgress";
+import EventProgressStatusCard from "./EventProgressStatusCard.jsx";
 
-export default function EventProgressCard({ eventId, projectId }) {
+export default function EventProgressCard({
+  eventId,
+  projectId,
+  projectTitle,
+  showDetailsAction = true,
+}) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(null);
+  const [resolvedEventId, setResolvedEventId] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -18,6 +31,7 @@ export default function EventProgressCard({ eventId, projectId }) {
       setLoading(true);
       setError("");
       setProgress(null);
+      setResolvedEventId("");
 
       try {
         let resolvedEventId = eventId;
@@ -26,11 +40,12 @@ export default function EventProgressCard({ eventId, projectId }) {
         // 🔍 Resolve eventId automaticamente se só veio projectId
         if (!resolvedEventId && resolvedProjectId) {
           const myEvents = await getMyEvents();
+          const normalizedProjectId = normalizeEntityId(resolvedProjectId);
           const found = (myEvents || []).find(
-            (e) => e.projectId === resolvedProjectId
+            (entry) => normalizeEntityId(entry?.projectId ?? entry?.ProjectId) === normalizedProjectId
           );
           if (found) {
-            resolvedEventId = found.eventId;
+            resolvedEventId = found.eventId ?? found.EventId;
           }
         }
 
@@ -50,6 +65,7 @@ export default function EventProgressCard({ eventId, projectId }) {
 
         if (!alive) return;
 
+        setResolvedEventId(resolvedEventId);
         setProgress(data);
       } catch {
         if (alive) {
@@ -67,10 +83,20 @@ export default function EventProgressCard({ eventId, projectId }) {
 
   /* ===================== RENDER ===================== */
 
+  const normalizedProgress = useMemo(() => {
+    if (!progress) return null;
+    return normalizeEventProjectProgress(progress);
+  }, [progress]);
+
+  const detailsHandler = useMemo(() => {
+    if (!showDetailsAction || !resolvedEventId) return null;
+    return () => navigate(`/events/${resolvedEventId}`);
+  }, [showDetailsAction, resolvedEventId, navigate]);
+
   if (loading) {
     return (
-      <div className="card">
-        <h3 className="font-semibold mb-2">Progresso do Evento</h3>
+      <div className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6 shadow-sm">
+        <h3 className="font-semibold mb-2">Evento</h3>
         <p className="text-sm text-muted">Carregando…</p>
       </div>
     );
@@ -78,42 +104,26 @@ export default function EventProgressCard({ eventId, projectId }) {
 
   if (error) {
     return (
-      <div className="card">
-        <h3 className="font-semibold mb-2">Progresso do Evento</h3>
+      <div className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6 shadow-sm">
+        <h3 className="font-semibold mb-2">Evento</h3>
         <p className="text-sm text-red-600">{error}</p>
       </div>
     );
   }
 
-  if (!progress) return null;
-
-  const normalizedProgress = normalizeEventProjectProgress(progress);
-  const eventName = normalizedProgress.eventName;
-  const current = normalizedProgress.totalWrittenInEvent;
-  const target = normalizedProgress.targetWords;
-  const percent = normalizedProgress.percent;
-  const remaining = normalizedProgress.remainingWords;
+  if (!normalizedProgress) return null;
 
   return (
-    <div className="card">
-      <h3 className="font-semibold mb-1">{eventName}</h3>
-
-      <p className="text-sm text-muted mb-2">
-        {current.toLocaleString("pt-BR")} /{" "}
-        {target.toLocaleString("pt-BR")} palavras
-      </p>
-
-      <div className="h-2 bg-black/10 rounded overflow-hidden mb-2">
-        <div
-          className="h-full bg-indigo-600"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-
-      <div className="flex justify-between text-sm text-muted">
-        <span>{percent}% concluído</span>
-        {remaining > 0 ? <span>{remaining.toLocaleString("pt-BR")} restantes</span> : <span>Meta concluída</span>}
-      </div>
-    </div>
+    <EventProgressStatusCard
+      eventName={normalizedProgress.eventName}
+      projectTitle={projectTitle}
+      totalWords={normalizedProgress.totalWrittenInEvent}
+      targetWords={normalizedProgress.targetWords}
+      percent={normalizedProgress.percent}
+      remainingWords={normalizedProgress.remainingWords}
+      won={normalizedProgress.won}
+      onAction={detailsHandler || undefined}
+      actionLabel="Detalhes"
+    />
   );
 }

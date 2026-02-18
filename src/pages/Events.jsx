@@ -4,6 +4,7 @@ import { getProjects } from "../api/projects";
 import { getActiveEvents, getMyEvents, joinEvent } from "../api/events";
 import JoinEventModal from "../components/JoinEventModal";
 import FeedbackModal from "../components/FeedbackModal.jsx";
+import EventProgressStatusCard from "../components/EventProgressStatusCard.jsx";
 import {
   normalizeEntityId,
   normalizeMyEventProgress,
@@ -267,43 +268,18 @@ export default function Events() {
           ) : (
             <div className="space-y-4">
               {normalizedMyEvents.map((ev) => (
-                <div
+                <EventProgressStatusCard
                   key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
-                  className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6 shadow-sm"
-                >
-                  <p className="text-sm uppercase tracking-wide text-gray-500 mb-1">Evento</p>
-
-                  <h3 className="text-2xl font-serif font-semibold">{ev.eventName}</h3>
-
-                  <p className="text-sm text-gray-600">
-                    Projeto: {ev.projectTitle}
-                  </p>
-
-                  <p className="text-sm text-gray-700 mb-2">
-                    {ev.totalWrittenInEvent.toLocaleString("pt-BR")} / {ev.targetWords.toLocaleString("pt-BR")} palavras
-                  </p>
-
-                  <div className="h-2 bg-[#e6dccb] rounded-full overflow-hidden mb-3">
-                    <div
-                      className="h-2 bg-[#8b6b4f]"
-                      style={{ width: `${ev.percent}%` }}
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      {ev.percent}% concluído
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/events/${ev.eventId}`)}
-                      className="px-4 py-2 border rounded-lg"
-                    >
-                      Detalhes
-                    </button>
-                  </div>
-                </div>
+                  eventName={ev.eventName}
+                  projectTitle={ev.projectTitle}
+                  totalWords={ev.totalWrittenInEvent}
+                  targetWords={ev.targetWords}
+                  percent={ev.percent}
+                  remainingWords={ev.remainingWords}
+                  won={ev.won}
+                  onAction={() => navigate(`/events/${ev.eventId}`)}
+                  actionLabel="Detalhes"
+                />
               ))}
             </div>
           )}
