@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import LoginPopover from "./LoginPopover";
 
 export default function Navbar() {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout, user, isBootstrapping } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -49,7 +49,7 @@ export default function Navbar() {
         </Link>
 
         {/* LANDING / PUBLIC (deslogado) */}
-        {!isAuthenticated && (
+        {!isAuthenticated && !isBootstrapping && (
           <div className="flex items-center gap-4">
             {!isLanding && (
               <NavLink to="/resources" className={navLink}>
@@ -82,7 +82,7 @@ export default function Navbar() {
         )}
 
         {/* APP (logado) */}
-        {isAuthenticated && (
+        {isAuthenticated && !isBootstrapping && (
           <div className="flex items-center gap-3 min-w-0">
             <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
               {user?.isAdmin ? (

@@ -1,29 +1,7 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import api, { clearAccessToken, setAccessToken } from "../api/http";
 
 const AuthContext = createContext();
-const TOKEN_KEYS = ["token", "accessToken", "jwt"];
-
-function readStoredToken() {
-  try {
-    for (const key of TOKEN_KEYS) {
-      const value = localStorage.getItem(key);
-      if (typeof value === "string" && value.trim().length > 0) {
-        return value;
-      }
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function clearStoredTokens() {
-  try {
-    TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
-  } catch {
-    // ignore
-  }
-}
 
 function decodeJwtPayload(token) {
   const payloadBase64Url = token.split(".")[1];
@@ -48,80 +26,113 @@ function parseBool(value) {
   return false;
 }
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => readStoredToken());
-
-useEffect(() => {
-  if (!token || typeof token !== "string") {
-    setUser(null);
-    return;
+function mapUserFromClaims(source) {
+  if (!source || typeof source !== "object") {
+    return null;
   }
 
-  try {
-    const decoded = decodeJwtPayload(token);
-    if (!decoded || isExpired(decoded)) {
-      clearStoredTokens();
-      setUser(null);
-      setToken(null);
-      return;
-    }
-
-    setUser({
-      id: decoded.nameid || decoded.sub || null,
-      email: decoded.email || null,
-      isAdmin: parseBool(decoded.isAdmin),
-      mustChangePassword: parseBool(decoded.mustChangePassword),
-    });
-  } catch {
-    setUser(null);
-    setToken(null);
-    clearStoredTokens();
-  }
-}, [token]);
-
-
-  function login(newToken) {
-  clearStoredTokens();
-  localStorage.setItem("token", newToken);
-  setToken(newToken);
-
-  // ✅ Decodifica e seta user imediatamente (evita race condition com ProtectedRoute)
-  try {
-    const decoded = decodeJwtPayload(newToken);
-    if (!decoded || isExpired(decoded)) {
-      throw new Error("Token expirado.");
-    }
-
-    setUser({
-      id: decoded.nameid || decoded.sub || null,
-      email: decoded.email || null,
-      isAdmin: parseBool(decoded.isAdmin),
-      mustChangePassword: parseBool(decoded.mustChangePassword),
-    });
-  } catch (err) {
-    console.error("Token inválido no login()", err);
-    setUser(null);
-    setToken(null);
-    clearStoredTokens();
-    throw err;
-  }
+  return {
+    id: source.nameid ?? source.sub ?? source.id ?? source.userId ?? null,
+    email: source.email ?? source.Email ?? null,
+    isAdmin: parseBool(source.isAdmin ?? source.IsAdmin ?? source.is_admin),
+    mustChangePassword: parseBool(
+      source.mustChangePassword ??
+        source.MustChangePassword ??
+        source.must_change_password
+    ),
+  };
 }
 
-  function logout() {
-    clearStoredTokens();
-    setToken(null);
-    setUser(null);
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+
+    const bootstrapSession = async () => {
+      try {
+        // Bootstrap via cookie-backed session when available.
+        const { data } = await api.get("/profile/me", {
+          skipAuthRedirectOn401: true,
+        });
+
+        if (!alive) return;
+
+        const sessionUser = mapUserFromClaims(data);
+        if (sessionUser?.email) {
+          setUser(sessionUser);
+        }
+      } catch {
+        if (!alive) return;
+        setUser(null);
+        setToken(null);
+        clearAccessToken();
+      } finally {
+        if (alive) {
+          setIsBootstrapping(false);
+        }
+      }
+    };
+
+    bootstrapSession();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function login(newToken) {
+    if (typeof newToken !== "string" || newToken.trim().length === 0) {
+      throw new Error("Token inválido recebido do servidor.");
+    }
+
+    const normalizedToken = newToken.trim();
+
+    try {
+      const decoded = decodeJwtPayload(normalizedToken);
+      if (!decoded || isExpired(decoded)) {
+        throw new Error("Token expirado.");
+      }
+
+      const mapped = mapUserFromClaims(decoded);
+
+      setAccessToken(normalizedToken);
+      setToken(normalizedToken);
+      setUser(mapped);
+      setIsBootstrapping(false);
+
+      return mapped;
+    } catch (error) {
+      setUser(null);
+      setToken(null);
+      clearAccessToken();
+      throw error;
+    }
   }
 
-  const isAuthenticated = !!user;
+  function logout() {
+    clearAccessToken();
+    setToken(null);
+    setUser(null);
+    setIsBootstrapping(false);
+  }
 
-return (
-  <AuthContext.Provider value={{ user, token, login, setToken: login, logout, isAuthenticated }}>
-    {children}
-  </AuthContext.Provider>
-);
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      login,
+      setToken: login,
+      logout,
+      isAuthenticated: !!user,
+      isBootstrapping,
+    }),
+    [isBootstrapping, token, user]
+  );
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

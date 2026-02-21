@@ -4,7 +4,7 @@ import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
-import { resolvePostAuthPath } from "../utils/authRedirect";
+import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
 export default function LoginModal({ open, onClose }) {
   const { login } = useAuth();
@@ -50,9 +50,9 @@ export default function LoginModal({ open, onClose }) {
     try {
       const token = await loginApi({ email, password });
       if (!token) throw new Error("Token não retornado pelo servidor.");
-      login(token);
+      const authenticatedUser = login(token);
       onClose?.();
-      navigate(resolvePostAuthPath(token, "/dashboard"), { replace: true });
+      navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
     } catch (ex) {
       setFeedback({
         open: true,

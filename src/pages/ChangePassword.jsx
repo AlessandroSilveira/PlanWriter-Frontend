@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/http";
-import { resolvePostAuthPath } from "../utils/authRedirect";
+import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
 export default function ChangePassword() {
   const { login } = useAuth();
@@ -34,9 +34,9 @@ export default function ChangePassword() {
         newPassword: password,
       });
 
-      login(data.token);
+      const authenticatedUser = login(data.token);
 
-      navigate(resolvePostAuthPath(data.token, "/dashboard"), { replace: true });
+      navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
     } catch (err) {
       setError(
         err?.response?.data?.message ||

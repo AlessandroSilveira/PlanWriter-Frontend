@@ -4,7 +4,6 @@ import api from "./http";
 export async function login(payload) {
   const response = await api.post("/auth/login", payload);
 
-
   return (
     response.data.accessToken ??
     response.data.AccessToken ??
@@ -33,8 +32,7 @@ export async function register({ firstName, lastName, dateOfBirth, email, passwo
   const { data } = await api.post("/auth/register", payload);
   return data;
 }
+
 export function logout() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("jwt");
+  return Promise.resolve();
 }
