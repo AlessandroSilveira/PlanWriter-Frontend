@@ -17,6 +17,7 @@ npm run dev
 ## Rotas de API esperadas
 - `POST /auth/login` -> { accessToken, user? }
 - `POST /auth/register`
+- `GET /profile/me` -> bootstrap da sessão (cookie/credenciais)
 - `GET /projects` -> lista projetos do usuário
 - `GET /projects/:id` -> detalhes
 - `GET /projects/:id/progress` -> histórico
@@ -24,7 +25,8 @@ npm run dev
 - `DELETE /progress/:progressId` -> excluir
 
 ## Observações
-- O token JWT é guardado no localStorage e enviado em `Authorization: Bearer ...`.
+- O frontend não persiste JWT em `localStorage/sessionStorage`.
+- Requisições usam `withCredentials: true` para suportar sessão baseada em cookie HttpOnly.
 - Base URL lida de `VITE_API_URL`.
 
 ## CI/CD

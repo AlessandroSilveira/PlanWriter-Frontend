@@ -23,6 +23,30 @@ function isAdminFromRole(roleClaim) {
   return false;
 }
 
+export function resolvePostAuthPathFromUser(user, fallback = "/dashboard") {
+  if (!user || typeof user !== "object") {
+    return fallback;
+  }
+
+  const mustChangePassword = parseBool(
+    user.mustChangePassword ??
+      user.MustChangePassword ??
+      user.must_change_password
+  );
+
+  const isAdmin =
+    parseBool(user.isAdmin ?? user.IsAdmin ?? user.is_admin) ||
+    isAdminFromRole(
+      user.role ??
+        user.roles ??
+        user["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"]
+    );
+
+  if (mustChangePassword) return "/change-password";
+  if (isAdmin) return "/admin/events";
+  return fallback;
+}
+
 export function resolvePostAuthPath(token, fallback = "/dashboard") {
   if (typeof token !== "string" || token.trim().length === 0) {
     return fallback;
@@ -30,24 +54,7 @@ export function resolvePostAuthPath(token, fallback = "/dashboard") {
 
   try {
     const decoded = decodeJwtPayload(token) || {};
-
-    const mustChangePassword = parseBool(
-      decoded.mustChangePassword ??
-      decoded.MustChangePassword ??
-      decoded.must_change_password
-    );
-
-    const isAdmin =
-      parseBool(decoded.isAdmin ?? decoded.IsAdmin ?? decoded.is_admin) ||
-      isAdminFromRole(
-        decoded.role ??
-        decoded.roles ??
-        decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"]
-      );
-
-    if (mustChangePassword) return "/change-password";
-    if (isAdmin) return "/admin/events";
-    return fallback;
+    return resolvePostAuthPathFromUser(decoded, fallback);
   } catch {
     return fallback;
   }

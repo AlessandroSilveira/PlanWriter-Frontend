@@ -4,7 +4,7 @@ import { login as apiLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
-import { resolvePostAuthPath } from "../utils/authRedirect";
+import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
 export default function LoginPopover({ open, anchorEl, onClose }) {
   const { login } = useAuth();
@@ -34,10 +34,10 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
         throw new Error("Token inválido recebido do servidor.");
       }
 
-      login(token);
+      const authenticatedUser = login(token);
 
       onClose?.();
-      navigate(resolvePostAuthPath(token, "/dashboard"), { replace: true });
+      navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
 
     } catch (err) {
       setFeedback({

@@ -2,9 +2,13 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ children }) {
-  const { user, token } = useAuth();
+  const { user, isBootstrapping } = useAuth();
 
-  if (!user || !token) {
+  if (isBootstrapping) {
+    return null;
+  }
+
+  if (!user) {
     return <Navigate to="/" replace />;
   }
 
