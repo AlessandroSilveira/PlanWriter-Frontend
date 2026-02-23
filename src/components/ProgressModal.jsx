@@ -3,6 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/http"; 
 import Alert from "./Alert.jsx";
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function getLocalDateInputValue(date = new Date()) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
 function normalizeGoalUnit(goalUnit) {
   const unit = String(goalUnit || "Words").toLowerCase();
   if (unit === "minutes" || unit === "pages" || unit === "words") return unit;
@@ -73,7 +81,7 @@ export default function ProgressModal({
       setNotes(defaultNote || "");
 
       // 🔥 Usa initialDate se vier do calendário
-      const dt = initialDate || new Date().toISOString().slice(0, 10);
+      const dt = initialDate || getLocalDateInputValue();
       setDate(dt);
 
       setWords(unit === "words" ? (defaultWords || "") : "");
@@ -165,7 +173,7 @@ export default function ProgressModal({
               className="input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
+              max={getLocalDateInputValue()}
             />
           </label>
 
