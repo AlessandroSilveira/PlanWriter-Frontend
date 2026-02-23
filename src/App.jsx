@@ -27,7 +27,6 @@ import ProfileMe from "./pages/ProfileMe.jsx";
 import PublicProfile from "./pages/PublicProfile.jsx";
 import Resources from "./pages/Resources.jsx";
 import Login from "./pages/Login.jsx";
-import Register from "./pages/Register.jsx";
 import ChangePassword from "./pages/ChangePassword.jsx";
 
 // ADMIN
@@ -52,7 +51,7 @@ export default function App() {
         {/* 🌍 Públicas */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<Navigate to="/?auth=register" replace />} />
         <Route path="/resources" element={<Resources />} />
         <Route path="/u/:slug" element={<PublicProfile />} />
 
