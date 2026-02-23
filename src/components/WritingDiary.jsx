@@ -121,9 +121,28 @@ export default function WritingDiary() {
         return true;
       });
 
-      const totalCount = filtered.length;
+      const getRowTime = (row) => {
+        const t = row?.dateRaw ? new Date(row.dateRaw).getTime() : NaN;
+        return Number.isFinite(t) ? t : 0;
+      };
+
+      const sorted = [...filtered].sort((a, b) => {
+        switch (filters.sort) {
+          case "date_asc":
+            return getRowTime(a) - getRowTime(b);
+          case "words_desc":
+            return (b.deltaWords || 0) - (a.deltaWords || 0) || (getRowTime(b) - getRowTime(a));
+          case "words_asc":
+            return (a.deltaWords || 0) - (b.deltaWords || 0) || (getRowTime(b) - getRowTime(a));
+          case "date_desc":
+          default:
+            return getRowTime(b) - getRowTime(a);
+        }
+      });
+
+      const totalCount = sorted.length;
       const start = Math.max(0, (page - 1) * pageSize);
-      const paged = filtered.slice(start, start + pageSize);
+      const paged = sorted.slice(start, start + pageSize);
 
       setRows(paged);
       setTotal(totalCount);
