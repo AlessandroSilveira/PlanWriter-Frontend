@@ -28,6 +28,24 @@ export default function EventDetails() {
   const formatDate = (value) =>
     value ? new Date(value).toLocaleDateString("pt-BR") : "—";
 
+  const getEffectiveStatusLabel = (ev) => {
+    if (!ev) return "—";
+
+    const nowMs = Date.now();
+    const startsAtMs = Date.parse(ev.startsAtUtc ?? ev.StartsAtUtc ?? "");
+    const endsAtMs = Date.parse(ev.endsAtUtc ?? ev.EndsAtUtc ?? "");
+
+    if (Number.isFinite(endsAtMs) && nowMs > endsAtMs) {
+      return "Encerrado";
+    }
+
+    if (Number.isFinite(startsAtMs) && nowMs < startsAtMs) {
+      return "Agendado";
+    }
+
+    return ev.isActive ? "Ativo" : "Encerrado";
+  };
+
   const normalizedProgress = useMemo(
     () =>
       progress
@@ -116,6 +134,8 @@ export default function EventDetails() {
   if (error) return <p className="p-6 text-red-600">{error}</p>;
   if (!event) return null;
 
+  const effectiveStatusLabel = getEffectiveStatusLabel(event);
+
   return (
     <header className="hero">
       <div className="container hero-inner space-y-10">
@@ -131,7 +151,7 @@ export default function EventDetails() {
               <strong>Meta:</strong> {event.defaultTargetWords}
             </div>
             <div>
-              <strong>Status:</strong> {event.isActive ? "Ativo" : "Encerrado"}
+              <strong>Status:</strong> {effectiveStatusLabel}
             </div>
             <div>
               <strong>Início:</strong> {formatDate(event.startsAtUtc)}

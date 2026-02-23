@@ -92,6 +92,14 @@ export default function Events() {
     [normalizedMyEvents]
   );
 
+  const activeMyEvents = useMemo(
+    () =>
+      normalizedMyEvents.filter((entry) =>
+        activeEventsById.has(normalizeEntityId(entry.eventId))
+      ),
+    [normalizedMyEvents, activeEventsById]
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -263,11 +271,11 @@ export default function Events() {
         <section>
           <h2 className="text-2xl font-serif font-semibold mb-4">Meus eventos</h2>
 
-          {normalizedMyEvents.length === 0 ? (
+          {activeMyEvents.length === 0 ? (
             <p className="text-sm text-gray-500">Você ainda não participa de nenhum evento.</p>
           ) : (
             <div className="space-y-4">
-              {normalizedMyEvents.map((ev) => (
+              {activeMyEvents.map((ev) => (
                 <EventProgressStatusCard
                   key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
                   eventName={ev.eventName}
