@@ -10,6 +10,7 @@ import { downloadCSV } from "../utils/csv";
 import { getProjects } from "../api/projects";
 import { getActiveEvents } from "../api/events";
 import Alert from "../components/Alert.jsx";
+import { isOngoing } from "../utils/overviewAggregation";
 
 // helpers
 const fmtDateBR = (d) => {
@@ -41,6 +42,11 @@ export default function WritingDiary() {
   const [msg, setMsg] = useState(""); // sucesso/infos
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
+
+  const activeProjects = useMemo(
+    () => (Array.isArray(projects) ? projects.filter(isOngoing) : []),
+    [projects]
+  );
 
   // boot: load projects + events
   useEffect(() => {
@@ -201,7 +207,7 @@ export default function WritingDiary() {
 
       {/* Filtros */}
       <HistoryFilters
-        projects={projects}
+        projects={activeProjects}
         events={events}
         initial={filters}
         onChange={(f) => {
