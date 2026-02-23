@@ -19,6 +19,35 @@ const fmt = (n) =>
 const startOfDay = (d) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
+const pad2 = (n) => String(n).padStart(2, "0");
+
+const toLocalDateKey = (d) => {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
+// Treat project progress Date as a logical calendar date (not an instant in time),
+// preserving yyyy-MM-dd from API payloads and avoiding browser timezone shifts.
+const extractDateKey = (raw) => {
+  if (!raw) return null;
+
+  if (typeof raw === "string") {
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  const d = raw instanceof Date ? raw : new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return toLocalDateKey(d);
+};
+
+const dateKeyToLocalDate = (key) => {
+  if (!key || typeof key !== "string") return null;
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+
 const diffDays = (a, b) =>
   Math.max(0, Math.ceil((b.getTime() - a.getTime()) / 86400000));
 
@@ -133,7 +162,7 @@ function DailyBarChart({ data, targetPerDay }) {
             />
 
             <title>
-              {new Date(d.date).toLocaleDateString("pt-BR")} —{" "}
+              {(dateKeyToLocalDate(d.date) ?? new Date(d.date)).toLocaleDateString("pt-BR")} —{" "}
               {d.value.toLocaleString("pt-BR")} palavras
             </title>
 
@@ -146,7 +175,7 @@ function DailyBarChart({ data, targetPerDay }) {
                 fontSize="10"
                 fill="#555"
               >
-                {new Date(d.date).getDate()}
+                {(dateKeyToLocalDate(d.date) ?? new Date(d.date)).getDate()}
               </text>
             )}
           </g>
@@ -201,7 +230,13 @@ export default function ProjectDetails() {
 
   const startDate = useMemo(() => {
     if (project?.startDate) return startOfDay(new Date(project.startDate));
-    if (history.length > 0) return startOfDay(new Date(history[0].date || history[0].Date));
+    if (history.length > 0) {
+      const key = extractDateKey(history[0].date || history[0].Date);
+      if (key) {
+        const parsed = dateKeyToLocalDate(key);
+        if (parsed) return startOfDay(parsed);
+      }
+    }
     return today;
   }, [project, history, today]);
 
@@ -224,8 +259,8 @@ export default function ProjectDetails() {
       const raw = h.date || h.Date;
       if (!raw) return;
 
-      const d = startOfDay(new Date(raw));
-      const key = d.toISOString().slice(0, 10);
+      const key = extractDateKey(raw);
+      if (!key) return;
       const val = Number(h.wordsWritten ?? h.WordsWritten ?? 0);
       map.set(key, (map.get(key) || 0) + val);
     });
@@ -236,7 +271,7 @@ export default function ProjectDetails() {
     for (let i = 0; i < totalDays; i++) {
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
+      const key = toLocalDateKey(d);
       const value = map.get(key) || 0;
       cum += value;
       days.push({ date: key, value, cum });
@@ -247,7 +282,7 @@ export default function ProjectDetails() {
 
   const totalAccum = dailyAgg.at(-1)?.cum ?? 0;
 
-  const todayKey = today.toISOString().slice(0, 10);
+  const todayKey = toLocalDateKey(today);
   const todayValue = dailyAgg.find((d) => d.date === todayKey)?.value ?? 0;
 
   const averagePerDay = elapsedDays > 0 ? Math.round(totalAccum / elapsedDays) : 0;
