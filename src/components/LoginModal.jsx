@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import FeedbackModal from "./FeedbackModal.jsx";
-import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
+import { getAuthFriendlyMessage, getRegisterFriendlyMessage } from "../utils/authErrorMessage";
 import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
 export default function LoginModal({ open, onClose, initialMode = "login" }) {
@@ -92,7 +92,7 @@ export default function LoginModal({ open, onClose, initialMode = "login" }) {
         open: true,
         type: "error",
         title: "Falha no cadastro",
-        message: ex?.response?.data?.message || ex?.message || "Falha no cadastro",
+        message: getRegisterFriendlyMessage(ex, "Não foi possível concluir o cadastro."),
         primaryLabel: "Fechar",
       });
     } finally {

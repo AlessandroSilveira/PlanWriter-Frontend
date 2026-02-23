@@ -16,8 +16,8 @@ export async function login(payload) {
 export const loginApi = login;
 
 export async function register({ firstName, lastName, dateOfBirth, email, password }) {
-  // Garante formato de data compatível: "YYYY-MM-DD"
-  const formattedDate = new Date(dateOfBirth).toISOString().split("T")[0];
+  // Input type="date" já entrega "YYYY-MM-DD"; evita parse UTC desnecessário.
+  const formattedDate = typeof dateOfBirth === "string" ? dateOfBirth : "";
 
   const payload = {
     FirstName: firstName,
@@ -26,8 +26,6 @@ export async function register({ firstName, lastName, dateOfBirth, email, passwo
     Email: email,
     Password: password,
   };
-
-  console.log("📦 Enviando para backend:", payload);
 
   const { data } = await api.post("/auth/register", payload);
   return data;
