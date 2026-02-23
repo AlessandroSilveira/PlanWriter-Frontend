@@ -90,6 +90,7 @@ export default function WritingDiary() {
 
       const normalized = items.map((it) => {
         const date = it.dateUtc ?? it.dateISO ?? it.date ?? it.Date ?? it.createdAt ?? it.CreatedAt ?? null;
+        const createdAt = it.createdAt ?? it.CreatedAt ?? null;
         const deltaWords = Number(
           it.wordsWritten ?? it.WordsWritten ?? it.wordsAdded ?? it.deltaWords ??
           it.WordsAdded ?? it.words ?? it.Words ?? 0
@@ -98,7 +99,7 @@ export default function WritingDiary() {
         const projectTitle = it.projectTitle ?? it.ProjectTitle ?? it.projectName ?? it.ProjectName ?? "";
         const eventName = it.eventName ?? it.EventName ?? it.eventTitle ?? it.EventTitle ?? "";
         const source = it.source ?? it.Source ?? "";
-        return { ...it, dateRaw: date, dateFmt: fmtDateBR(date), deltaWords, notes, projectTitle, eventName, source };
+        return { ...it, dateRaw: date, createdAtRaw: createdAt, dateFmt: fmtDateBR(date), deltaWords, notes, projectTitle, eventName, source };
       });
 
       const from = filters.dateFrom ? new Date(filters.dateFrom) : null;
@@ -125,18 +126,26 @@ export default function WritingDiary() {
         const t = row?.dateRaw ? new Date(row.dateRaw).getTime() : NaN;
         return Number.isFinite(t) ? t : 0;
       };
+      const getCreatedTime = (row) => {
+        const t = row?.createdAtRaw ? new Date(row.createdAtRaw).getTime() : NaN;
+        return Number.isFinite(t) ? t : 0;
+      };
 
       const sorted = [...filtered].sort((a, b) => {
+        const dateDiffDesc = getRowTime(b) - getRowTime(a);
+        const dateDiffAsc = getRowTime(a) - getRowTime(b);
+        const createdDiffDesc = getCreatedTime(b) - getCreatedTime(a);
+        const createdDiffAsc = getCreatedTime(a) - getCreatedTime(b);
         switch (filters.sort) {
           case "date_asc":
-            return getRowTime(a) - getRowTime(b);
+            return dateDiffAsc || createdDiffAsc;
           case "words_desc":
-            return (b.deltaWords || 0) - (a.deltaWords || 0) || (getRowTime(b) - getRowTime(a));
+            return (b.deltaWords || 0) - (a.deltaWords || 0) || dateDiffDesc || createdDiffDesc;
           case "words_asc":
-            return (a.deltaWords || 0) - (b.deltaWords || 0) || (getRowTime(b) - getRowTime(a));
+            return (a.deltaWords || 0) - (b.deltaWords || 0) || dateDiffDesc || createdDiffDesc;
           case "date_desc":
           default:
-            return getRowTime(b) - getRowTime(a);
+            return dateDiffDesc || createdDiffDesc;
         }
       });
 
