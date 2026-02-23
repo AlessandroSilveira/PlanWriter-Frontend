@@ -26,6 +26,20 @@ export default function HistoryFilters({ projects = [], events = [], initial = {
   }, [projectId, projects]);
 
   useEffect(() => {
+    if (!projectId) return;
+
+    const existsInVisibleList = projects.some((p) => {
+      const pid = p?.id ?? p?.projectId ?? "";
+      return String(pid) === String(projectId);
+    });
+
+    if (!existsInVisibleList) {
+      const firstProjectId = projects[0]?.id ?? projects[0]?.projectId ?? "";
+      setProjectId(firstProjectId || "");
+    }
+  }, [projectId, projects]);
+
+  useEffect(() => {
     onChange?.({ projectId, eventId, source, dateFrom, dateTo, minWords, maxWords, sort });
   }, [projectId, eventId, source, dateFrom, dateTo, minWords, maxWords, sort]); // eslint-disable-line
 
