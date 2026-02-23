@@ -51,12 +51,6 @@ export default function Navbar() {
         {/* LANDING / PUBLIC (deslogado) */}
         {!isAuthenticated && !isBootstrapping && (
           <div className="flex items-center gap-4">
-            {!isLanding && (
-              <NavLink to="/resources" className={navLink}>
-                Recursos
-              </NavLink>
-            )}
-
             <button
               onClick={(e) => {
                 setAnchorEl(e.currentTarget);

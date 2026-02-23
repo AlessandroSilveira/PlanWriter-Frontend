@@ -6,7 +6,7 @@ import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage } from "../utils/authErrorMessage";
 import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
-export default function LoginModal({ open, onClose }) {
+export default function LoginModal({ open, onClose, initialMode = "login" }) {
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -32,9 +32,9 @@ export default function LoginModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     setLoading(false);
-    setMode("login");
+    setMode(initialMode === "register" ? "register" : "login");
     setFeedback((prev) => ({ ...prev, open: false }));
-  }, [open]);
+  }, [open, initialMode]);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose?.();

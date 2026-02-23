@@ -1,8 +1,31 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import LoginModal from "../components/LoginModal";
 
 export default function Landing() {
   const [open, setOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const authIntent = searchParams.get("auth");
+  const modalInitialMode = useMemo(
+    () => (authIntent === "register" ? "register" : "login"),
+    [authIntent]
+  );
+
+  useEffect(() => {
+    if (authIntent === "register" || authIntent === "login") {
+      setOpen(true);
+    }
+  }, [authIntent]);
+
+  const handleCloseModal = () => {
+    setOpen(false);
+
+    if (authIntent) {
+      navigate("/", { replace: true });
+    }
+  };
 
   return (
     <>
@@ -69,7 +92,11 @@ export default function Landing() {
         
       </section>
 
-      <LoginModal open={open} onClose={() => setOpen(false)} />
+      <LoginModal
+        open={open}
+        onClose={handleCloseModal}
+        initialMode={modalInitialMode}
+      />
     </>
   );
 }
