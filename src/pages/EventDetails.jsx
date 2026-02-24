@@ -28,22 +28,30 @@ export default function EventDetails() {
   const formatDate = (value) =>
     value ? new Date(value).toLocaleDateString("pt-BR") : "—";
 
-  const getEffectiveStatusLabel = (ev) => {
-    if (!ev) return "—";
+  const getEffectiveStatus = (ev) => {
+    if (!ev) return "unknown";
 
     const nowMs = Date.now();
     const startsAtMs = Date.parse(ev.startsAtUtc ?? ev.StartsAtUtc ?? "");
     const endsAtMs = Date.parse(ev.endsAtUtc ?? ev.EndsAtUtc ?? "");
 
     if (Number.isFinite(endsAtMs) && nowMs > endsAtMs) {
-      return "Encerrado";
+      return "closed";
     }
 
     if (Number.isFinite(startsAtMs) && nowMs < startsAtMs) {
-      return "Agendado";
+      return "scheduled";
     }
 
-    return ev.isActive ? "Ativo" : "Encerrado";
+    return ev.isActive ? "active" : "closed";
+  };
+
+  const getEffectiveStatusLabel = (ev) => {
+    const status = getEffectiveStatus(ev);
+    if (status === "closed") return "Encerrado";
+    if (status === "scheduled") return "Agendado";
+    if (status === "active") return "Ativo";
+    return "—";
   };
 
   const normalizedProgress = useMemo(
@@ -135,6 +143,7 @@ export default function EventDetails() {
   if (!event) return null;
 
   const effectiveStatusLabel = getEffectiveStatusLabel(event);
+  const isEventClosed = getEffectiveStatus(event) === "closed";
 
   return (
     <header className="hero">
@@ -162,7 +171,26 @@ export default function EventDetails() {
           </div>
         </div>
 
-        <WordWarPanel eventId={eventId} eventName={event.name} />
+        {isEventClosed ? (
+          <section className="bg-[#fffaf2] border border-[#eadfce] rounded-xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-serif font-semibold">Word War</h2>
+                <p className="text-gray-600 mt-1">
+                  Rodadas rápidas em tempo real para disputar palavras no evento {event.name}.
+                </p>
+                <p className="text-sm text-gray-500 mt-4">
+                  Evento encerrado. Rodadas Word War não estão mais disponíveis.
+                </p>
+              </div>
+              <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-sm font-medium">
+                Encerrado
+              </span>
+            </div>
+          </section>
+        ) : (
+          <WordWarPanel eventId={eventId} eventName={event.name} />
+        )}
 
         <section>
           <h2 className="text-xl font-serif font-semibold mb-3">Seu progresso</h2>
