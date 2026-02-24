@@ -9,7 +9,7 @@ import {
   getMonthlyProgress,
 } from '../api/projects.js';
 
-import { getMyEvents } from '../api/events';
+import { getActiveEvents, getMyEvents } from '../api/events';
 
 import EventProgressCard from "../components/EventProgressCard.jsx";
 import ProjectComparisonChart from "../components/ProjectComparisonChart";
@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [monthly, setMonthly] = useState({ loading: true, total: 0 });
 
   const [myEvents, setMyEvents] = useState([]);
+  const [activeEventIds, setActiveEventIds] = useState(new Set());
   const [eventsLoading, setEventsLoading] = useState(true);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
 
@@ -93,10 +94,20 @@ export default function Dashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getMyEvents();
-        setMyEvents(Array.isArray(data) ? data : []);
+        const [mine, active] = await Promise.all([getMyEvents(), getActiveEvents()]);
+        setMyEvents(Array.isArray(mine) ? mine : []);
+
+        const activeRows = Array.isArray(active?.items) ? active.items : active ?? [];
+        setActiveEventIds(
+          new Set(
+            activeRows
+              .map((ev) => String(ev?.id ?? ev?.Id ?? "").toLowerCase())
+              .filter(Boolean)
+          )
+        );
       } catch {
         setMyEvents([]);
+        setActiveEventIds(new Set());
       } finally {
         setEventsLoading(false);
       }
@@ -196,6 +207,9 @@ export default function Dashboard() {
     await load();
   };
   const activeProjects = projects.filter(isOngoing);
+  const activeMyEvents = myEvents.filter((ev) =>
+    activeEventIds.has(String(ev?.eventId ?? ev?.EventId ?? ev?.id ?? ev?.Id ?? "").toLowerCase())
+  );
 
   /* ===================== META DO MÊS ===================== */
   const MONTHLY_GOAL = 50000;
@@ -360,12 +374,12 @@ export default function Dashboard() {
         </div>
 
         {/* EVENTOS */}
-        {!eventsLoading && myEvents.length > 0 && (
+        {!eventsLoading && activeMyEvents.length > 0 && (
           <section className="container mt-4">
             <div className="panel">
               <h2 className="section-title">Eventos em que você está participando</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                {myEvents.map((ev) => (
+                {activeMyEvents.map((ev) => (
                   <EventProgressCard
                     key={ev.eventId ?? ev.id}
                     eventId={ev.eventId ?? ev.id}

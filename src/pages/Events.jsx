@@ -100,6 +100,14 @@ export default function Events() {
     [normalizedMyEvents, activeEventsById]
   );
 
+  const closedMyEvents = useMemo(
+    () =>
+      normalizedMyEvents.filter(
+        (entry) => !activeEventsById.has(normalizeEntityId(entry.eventId))
+      ),
+    [normalizedMyEvents, activeEventsById]
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -272,12 +280,39 @@ export default function Events() {
           <h2 className="text-2xl font-serif font-semibold mb-4">Meus eventos</h2>
 
           {activeMyEvents.length === 0 ? (
-            <p className="text-sm text-gray-500">Você ainda não participa de nenhum evento.</p>
+            <p className="text-sm text-gray-500">Você ainda não participa de nenhum evento ativo.</p>
           ) : (
             <div className="space-y-4">
               {activeMyEvents.map((ev) => (
                 <EventProgressStatusCard
                   key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
+                  eventName={ev.eventName}
+                  projectTitle={ev.projectTitle}
+                  totalWords={ev.totalWrittenInEvent}
+                  targetWords={ev.targetWords}
+                  percent={ev.percent}
+                  remainingWords={ev.remainingWords}
+                  won={ev.won}
+                  onAction={() => navigate(`/events/${ev.eventId}`)}
+                  actionLabel="Detalhes"
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <hr className="border-[#e7dccd]" />
+
+        <section>
+          <h2 className="text-2xl font-serif font-semibold mb-4">Eventos encerrados</h2>
+
+          {closedMyEvents.length === 0 ? (
+            <p className="text-sm text-gray-500">Você ainda não tem eventos encerrados.</p>
+          ) : (
+            <div className="space-y-4">
+              {closedMyEvents.map((ev) => (
+                <EventProgressStatusCard
+                  key={`closed-${ev.eventId}-${ev.projectId ?? "no-project"}`}
                   eventName={ev.eventName}
                   projectTitle={ev.projectTitle}
                   totalWords={ev.totalWrittenInEvent}
