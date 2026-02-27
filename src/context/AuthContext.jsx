@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import api, { clearAccessToken, setAccessToken } from "../api/http";
+import api, { clearAccessToken, getAccessToken, setAccessToken } from "../api/http";
 
 const AuthContext = createContext();
 
@@ -52,6 +52,28 @@ export function AuthProvider({ children }) {
     let alive = true;
 
     const bootstrapSession = async () => {
+      const storedToken = getAccessToken();
+      if (storedToken) {
+        try {
+          const decoded = decodeJwtPayload(storedToken);
+          if (!decoded || isExpired(decoded)) {
+            throw new Error("Stored token expired.");
+          }
+
+          const mapped = mapUserFromClaims(decoded);
+          if (mapped?.email) {
+            setToken(storedToken);
+            setUser(mapped);
+            setIsBootstrapping(false);
+            return;
+          }
+        } catch {
+          clearAccessToken();
+          setToken(null);
+          setUser(null);
+        }
+      }
+
       try {
         // Bootstrap via cookie-backed session when available.
         const { data } = await api.get("/profile/me", {
