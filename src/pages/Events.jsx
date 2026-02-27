@@ -19,6 +19,7 @@ import {
   buildFallbackParticipantStatus,
   makeParticipantStatusKey,
   normalizeParticipantStatus,
+  resolveParticipantJourney,
 } from "../utils/participantJourney";
 
 function getApiErrorMessage(error) {
@@ -143,6 +144,23 @@ export default function Events() {
     }
     return fallback;
   }, [normalizedMyEvents, participantStatuses, activeEventsById]);
+
+  const winnerCentralTarget = useMemo(() => {
+    for (const entry of normalizedMyEvents) {
+      if (!entry.eventId || !entry.projectId) continue;
+      const key = makeParticipantStatusKey(entry.eventId, entry.projectId);
+      const status = statusByEntry[key];
+      if (!status) continue;
+      const journey = resolveParticipantJourney(status);
+      if (journey.primaryAction === "winner") {
+        return {
+          eventId: entry.eventId,
+          projectId: entry.projectId,
+        };
+      }
+    }
+    return null;
+  }, [normalizedMyEvents, statusByEntry]);
 
   useEffect(() => {
     let mounted = true;
@@ -301,11 +319,27 @@ export default function Events() {
   return (
     <header className="hero">
       <div className="container hero-inner">
-        <div>
-          <h1 className="text-4xl font-serif font-semibold text-gray-900">Eventos</h1>
-          <p className="text-gray-600 mt-2">
-            Participe de desafios de escrita e acompanhe seu desempenho.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-4xl font-serif font-semibold text-gray-900">Eventos</h1>
+            <p className="text-gray-600 mt-2">
+              Participe de desafios de escrita e acompanhe seu desempenho.
+            </p>
+          </div>
+
+          {winnerCentralTarget && (
+            <button
+              type="button"
+              className="button"
+              onClick={() =>
+                navigate(
+                  `/winner?eventId=${winnerCentralTarget.eventId}&projectId=${winnerCentralTarget.projectId}`
+                )
+              }
+            >
+              Central do vencedor
+            </button>
+          )}
         </div>
 
         <section>
