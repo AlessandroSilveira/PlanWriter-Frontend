@@ -4,13 +4,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getMyEvents,
+  getEventParticipantStatus,
   getEventProjectProgress,
 } from "../api/events";
 import {
   normalizeEntityId,
   normalizeEventProjectProgress,
 } from "../utils/eventProgress";
-import EventProgressStatusCard from "./EventProgressStatusCard.jsx";
+import {
+  buildFallbackParticipantStatus,
+  normalizeParticipantStatus,
+} from "../utils/participantJourney";
+import EventParticipantJourneyCard from "./EventParticipantJourneyCard.jsx";
 
 export default function EventProgressCard({
   eventId,
@@ -22,7 +27,9 @@ export default function EventProgressCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(null);
+  const [participantStatus, setParticipantStatus] = useState(null);
   const [resolvedEventId, setResolvedEventId] = useState("");
+  const [resolvedProjectId, setResolvedProjectId] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -31,7 +38,9 @@ export default function EventProgressCard({
       setLoading(true);
       setError("");
       setProgress(null);
+      setParticipantStatus(null);
       setResolvedEventId("");
+      setResolvedProjectId("");
 
       try {
         let resolvedEventId = eventId;
@@ -66,7 +75,35 @@ export default function EventProgressCard({
         if (!alive) return;
 
         setResolvedEventId(resolvedEventId);
+        setResolvedProjectId(resolvedProjectId);
         setProgress(data);
+
+        try {
+          const unifiedStatus = await getEventParticipantStatus(
+            resolvedEventId,
+            resolvedProjectId
+          );
+          if (!alive) return;
+          setParticipantStatus(normalizeParticipantStatus(unifiedStatus));
+        } catch {
+          if (!alive) return;
+          const normalizedProgress = normalizeEventProjectProgress(data);
+          setParticipantStatus(
+            buildFallbackParticipantStatus({
+              eventId: resolvedEventId,
+              projectId: resolvedProjectId,
+              eventName: normalizedProgress?.eventName ?? "Evento",
+              projectTitle: projectTitle ?? "Participação individual",
+              totalWords: normalizedProgress?.totalWrittenInEvent ?? 0,
+              targetWords: normalizedProgress?.targetWords ?? 0,
+              percent: normalizedProgress?.percent ?? 0,
+              remainingWords: normalizedProgress?.remainingWords ?? 0,
+              isEventClosed: false,
+              isEventActive: true,
+              isWinner: normalizedProgress?.won ?? false,
+            })
+          );
+        }
       } catch {
         if (alive) {
           setError("Não foi possível carregar o progresso do evento.");
@@ -79,7 +116,7 @@ export default function EventProgressCard({
     return () => {
       alive = false;
     };
-  }, [eventId, projectId]);
+  }, [eventId, projectId, projectTitle]);
 
   /* ===================== RENDER ===================== */
 
@@ -88,10 +125,52 @@ export default function EventProgressCard({
     return normalizeEventProjectProgress(progress);
   }, [progress]);
 
+  const resolvedStatus = useMemo(() => {
+    if (participantStatus) return participantStatus;
+    if (!normalizedProgress) return null;
+
+    return buildFallbackParticipantStatus({
+      eventId: resolvedEventId,
+      projectId: resolvedProjectId,
+      eventName: normalizedProgress.eventName,
+      projectTitle: projectTitle ?? "Participação individual",
+      totalWords: normalizedProgress.totalWrittenInEvent,
+      targetWords: normalizedProgress.targetWords,
+      percent: normalizedProgress.percent,
+      remainingWords: normalizedProgress.remainingWords,
+      isEventClosed: false,
+      isEventActive: true,
+      isWinner: normalizedProgress.won,
+    });
+  }, [
+    participantStatus,
+    normalizedProgress,
+    resolvedEventId,
+    resolvedProjectId,
+    projectTitle,
+  ]);
+
   const detailsHandler = useMemo(() => {
     if (!showDetailsAction || !resolvedEventId) return null;
     return () => navigate(`/events/${resolvedEventId}`);
   }, [showDetailsAction, resolvedEventId, navigate]);
+
+  const validateHandler = useMemo(() => {
+    if (!resolvedEventId || !resolvedProjectId) return null;
+    return () =>
+      navigate(`/validate?eventId=${resolvedEventId}&projectId=${resolvedProjectId}`);
+  }, [resolvedEventId, resolvedProjectId, navigate]);
+
+  const winnerHandler = useMemo(() => {
+    if (!resolvedEventId || !resolvedProjectId) return null;
+    return () =>
+      navigate(`/winner?eventId=${resolvedEventId}&projectId=${resolvedProjectId}`);
+  }, [resolvedEventId, resolvedProjectId, navigate]);
+
+  const projectHandler = useMemo(() => {
+    if (!resolvedProjectId) return null;
+    return () => navigate(`/projects/${resolvedProjectId}`);
+  }, [resolvedProjectId, navigate]);
 
   if (loading) {
     return (
@@ -111,19 +190,15 @@ export default function EventProgressCard({
     );
   }
 
-  if (!normalizedProgress) return null;
+  if (!resolvedStatus) return null;
 
   return (
-    <EventProgressStatusCard
-      eventName={normalizedProgress.eventName}
-      projectTitle={projectTitle}
-      totalWords={normalizedProgress.totalWrittenInEvent}
-      targetWords={normalizedProgress.targetWords}
-      percent={normalizedProgress.percent}
-      remainingWords={normalizedProgress.remainingWords}
-      won={normalizedProgress.won}
-      onAction={detailsHandler || undefined}
-      actionLabel="Detalhes"
+    <EventParticipantJourneyCard
+      status={resolvedStatus}
+      onOpenDetails={detailsHandler || undefined}
+      onOpenValidate={validateHandler || undefined}
+      onOpenWinner={winnerHandler || undefined}
+      onOpenProject={projectHandler || undefined}
     />
   );
 }

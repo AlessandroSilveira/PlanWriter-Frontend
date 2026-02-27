@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getEventById,
+  getEventParticipantStatus,
   getMyEvents,
   getEventProjectProgress,
   getEventLeaderboard,
@@ -9,8 +10,12 @@ import {
 } from "../api/events";
 import { useAuth } from "../context/AuthContext";
 import WordWarPanel from "../components/WordWarPanel.jsx";
-import EventProgressStatusCard from "../components/EventProgressStatusCard.jsx";
+import EventParticipantJourneyCard from "../components/EventParticipantJourneyCard.jsx";
 import { normalizeEventProjectProgress } from "../utils/eventProgress";
+import {
+  buildFallbackParticipantStatus,
+  normalizeParticipantStatus,
+} from "../utils/participantJourney";
 
 export default function EventDetails() {
   const { user } = useAuth();
@@ -20,6 +25,7 @@ export default function EventDetails() {
   const [event, setEvent] = useState(null);
   const [myEvent, setMyEvent] = useState(null);
   const [progress, setProgress] = useState(null);
+  const [participantStatus, setParticipantStatus] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -63,9 +69,31 @@ export default function EventDetails() {
         : null,
     [progress, event?.defaultTargetWords]
   );
+  const effectiveStatus = useMemo(() => getEffectiveStatus(event), [event]);
+  const isEventClosed = effectiveStatus === "closed";
+  const effectiveStatusLabel = useMemo(
+    () => getEffectiveStatusLabel(event),
+    [event]
+  );
 
-  const percent = normalizedProgress?.percent ?? 0;
-  const isCompleted = normalizedProgress?.won ?? false;
+  const resolvedParticipantStatus = useMemo(() => {
+    if (participantStatus) return participantStatus;
+    if (!event || !myEvent || !normalizedProgress) return null;
+
+    return buildFallbackParticipantStatus({
+      eventId: myEvent.eventId,
+      projectId: myEvent.projectId,
+      eventName: event.name ?? "Evento",
+      projectTitle: myEvent.projectTitle,
+      totalWords: normalizedProgress.totalWrittenInEvent,
+      targetWords: normalizedProgress.targetWords,
+      percent: normalizedProgress.percent,
+      remainingWords: normalizedProgress.remainingWords,
+      isEventClosed,
+      isEventActive: !isEventClosed,
+      isWinner: normalizedProgress.won,
+    });
+  }, [participantStatus, event, myEvent, normalizedProgress, isEventClosed]);
 
   useEffect(() => {
     let mounted = true;
@@ -118,18 +146,27 @@ export default function EventDetails() {
     (async () => {
       if (!myEvent?.projectId) {
         setProgress(null);
+        setParticipantStatus(null);
         return;
       }
 
       try {
-        const eventProgress = await getEventProjectProgress(
-          myEvent.eventId,
-          myEvent.projectId
-        );
+        const [eventProgress, unifiedStatus] = await Promise.all([
+          getEventProjectProgress(myEvent.eventId, myEvent.projectId).catch(() => null),
+          getEventParticipantStatus(myEvent.eventId, myEvent.projectId).catch(() => null),
+        ]);
 
-        if (mounted) setProgress(eventProgress);
+        if (!mounted) return;
+
+        setProgress(eventProgress);
+        setParticipantStatus(
+          unifiedStatus ? normalizeParticipantStatus(unifiedStatus) : null
+        );
       } catch {
-        if (mounted) setProgress(null);
+        if (mounted) {
+          setProgress(null);
+          setParticipantStatus(null);
+        }
       }
     })();
 
@@ -141,9 +178,6 @@ export default function EventDetails() {
   if (loading) return <p className="p-6">Carregando evento…</p>;
   if (error) return <p className="p-6 text-red-600">{error}</p>;
   if (!event) return null;
-
-  const effectiveStatusLabel = getEffectiveStatusLabel(event);
-  const isEventClosed = getEffectiveStatus(event) === "closed";
 
   return (
     <header className="hero">
@@ -199,15 +233,16 @@ export default function EventDetails() {
             <p className="text-sm text-gray-500">
               Você ainda não participa deste evento.
             </p>
-          ) : normalizedProgress ? (
-            <EventProgressStatusCard
-              eventName={event.name}
-              projectTitle={myEvent.projectTitle}
-              totalWords={normalizedProgress.totalWrittenInEvent}
-              targetWords={normalizedProgress.targetWords}
-              percent={percent}
-              remainingWords={normalizedProgress.remainingWords}
-              won={isCompleted}
+          ) : resolvedParticipantStatus ? (
+            <EventParticipantJourneyCard
+              status={resolvedParticipantStatus}
+              onOpenValidate={() =>
+                navigate(`/validate?eventId=${myEvent.eventId}&projectId=${myEvent.projectId}`)
+              }
+              onOpenWinner={() =>
+                navigate(`/winner?eventId=${myEvent.eventId}&projectId=${myEvent.projectId}`)
+              }
+              onOpenProject={() => navigate(`/projects/${myEvent.projectId}`)}
             />
           ) : (
             <p className="text-sm text-gray-500">Nenhum progresso ainda.</p>
@@ -257,19 +292,7 @@ export default function EventDetails() {
           </button>
 
           <div className="flex items-center gap-2">
-            {myEvent && (
-              <button
-                type="button"
-                className="px-4 py-2 border rounded-lg"
-                onClick={() =>
-                  navigate(`/winner?eventId=${eventId}&projectId=${myEvent.projectId}`)
-                }
-              >
-                Central do vencedor
-              </button>
-            )}
-
-            {myEvent && (
+            {myEvent && !isEventClosed && (
               <button
                 onClick={async () => {
                   await leaveEvent(eventId, myEvent.projectId);
