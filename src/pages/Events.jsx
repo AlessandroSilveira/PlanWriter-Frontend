@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProjects } from "../api/projects";
-import { getActiveEvents, getMyEvents, joinEvent } from "../api/events";
+import {
+  getActiveEvents,
+  getEventParticipantStatus,
+  getMyEvents,
+  joinEvent,
+} from "../api/events";
 import JoinEventModal from "../components/JoinEventModal";
 import FeedbackModal from "../components/FeedbackModal.jsx";
-import EventProgressStatusCard from "../components/EventProgressStatusCard.jsx";
+import EventParticipantJourneyCard from "../components/EventParticipantJourneyCard.jsx";
 import {
   normalizeEntityId,
   normalizeMyEventProgress,
   resolveTargetWords,
 } from "../utils/eventProgress";
+import {
+  buildFallbackParticipantStatus,
+  makeParticipantStatusKey,
+  normalizeParticipantStatus,
+} from "../utils/participantJourney";
 
 function getApiErrorMessage(error) {
   const fallback = "Não foi possível concluir sua participação agora. Tente novamente.";
@@ -56,6 +66,8 @@ export default function Events() {
 
   const [joinModalEvent, setJoinModalEvent] = useState(null);
   const [joining, setJoining] = useState(false);
+  const [participantStatuses, setParticipantStatuses] = useState({});
+  const [loadingParticipantStatuses, setLoadingParticipantStatuses] = useState(false);
 
   const [feedback, setFeedback] = useState({
     open: false,
@@ -108,6 +120,30 @@ export default function Events() {
     [normalizedMyEvents, activeEventsById]
   );
 
+  const statusByEntry = useMemo(() => {
+    const fallback = {};
+    for (const entry of normalizedMyEvents) {
+      if (!entry.eventId || !entry.projectId) continue;
+      const key = makeParticipantStatusKey(entry.eventId, entry.projectId);
+      fallback[key] =
+        participantStatuses[key] ||
+        buildFallbackParticipantStatus({
+          eventId: entry.eventId,
+          projectId: entry.projectId,
+          eventName: entry.eventName,
+          projectTitle: entry.projectTitle,
+          totalWords: entry.totalWrittenInEvent,
+          targetWords: entry.targetWords,
+          percent: entry.percent,
+          remainingWords: entry.remainingWords,
+          isEventClosed: !activeEventsById.has(normalizeEntityId(entry.eventId)),
+          isEventActive: activeEventsById.has(normalizeEntityId(entry.eventId)),
+          isWinner: entry.won,
+        });
+    }
+    return fallback;
+  }, [normalizedMyEvents, participantStatuses, activeEventsById]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -140,6 +176,59 @@ export default function Events() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const targets = normalizedMyEvents.filter((entry) => entry.eventId && entry.projectId);
+      if (!targets.length) {
+        setParticipantStatuses({});
+        setLoadingParticipantStatuses(false);
+        return;
+      }
+
+      setLoadingParticipantStatuses(true);
+
+      const results = await Promise.allSettled(
+        targets.map((entry) => getEventParticipantStatus(entry.eventId, entry.projectId))
+      );
+
+      if (cancelled) return;
+
+      const next = {};
+      targets.forEach((entry, index) => {
+        const key = makeParticipantStatusKey(entry.eventId, entry.projectId);
+        const result = results[index];
+        if (result.status === "fulfilled") {
+          const normalized = normalizeParticipantStatus(result.value);
+          if (normalized) next[key] = normalized;
+          return;
+        }
+
+        next[key] = buildFallbackParticipantStatus({
+          eventId: entry.eventId,
+          projectId: entry.projectId,
+          eventName: entry.eventName,
+          projectTitle: entry.projectTitle,
+          totalWords: entry.totalWrittenInEvent,
+          targetWords: entry.targetWords,
+          percent: entry.percent,
+          remainingWords: entry.remainingWords,
+          isEventClosed: !activeEventsById.has(normalizeEntityId(entry.eventId)),
+          isEventActive: activeEventsById.has(normalizeEntityId(entry.eventId)),
+          isWinner: entry.won,
+        });
+      });
+
+      setParticipantStatuses(next);
+      setLoadingParticipantStatuses(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedMyEvents, activeEventsById]);
 
   if (loading) return <p className="p-6">Carregando eventos…</p>;
   if (error) return <p className="p-6 text-red-600">{error}</p>;
@@ -283,21 +372,50 @@ export default function Events() {
             <p className="text-sm text-gray-500">Você ainda não participa de nenhum evento ativo.</p>
           ) : (
             <div className="space-y-4">
-              {activeMyEvents.map((ev) => (
-                <EventProgressStatusCard
-                  key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
-                  eventName={ev.eventName}
-                  projectTitle={ev.projectTitle}
-                  totalWords={ev.totalWrittenInEvent}
-                  targetWords={ev.targetWords}
-                  percent={ev.percent}
-                  remainingWords={ev.remainingWords}
-                  won={ev.won}
-                  onAction={() => navigate(`/events/${ev.eventId}`)}
-                  actionLabel="Detalhes"
-                />
-              ))}
+              {activeMyEvents.map((ev) => {
+                const hasProject = Boolean(ev.projectId);
+                const status = hasProject
+                  ? statusByEntry[makeParticipantStatusKey(ev.eventId, ev.projectId)]
+                  : buildFallbackParticipantStatus({
+                      eventId: ev.eventId,
+                      projectId: null,
+                      eventName: ev.eventName,
+                      projectTitle: ev.projectTitle,
+                      totalWords: ev.totalWrittenInEvent,
+                      targetWords: ev.targetWords,
+                      percent: ev.percent,
+                      remainingWords: ev.remainingWords,
+                      isEventClosed: false,
+                      isEventActive: true,
+                      isWinner: ev.won,
+                    });
+
+                return (
+                  <EventParticipantJourneyCard
+                    key={`${ev.eventId}-${ev.projectId ?? "no-project"}`}
+                    status={status}
+                    onOpenDetails={() => navigate(`/events/${ev.eventId}`)}
+                    onOpenValidate={
+                      hasProject
+                        ? () =>
+                            navigate(`/validate?eventId=${ev.eventId}&projectId=${ev.projectId}`)
+                        : undefined
+                    }
+                    onOpenWinner={
+                      hasProject
+                        ? () =>
+                            navigate(`/winner?eventId=${ev.eventId}&projectId=${ev.projectId}`)
+                        : undefined
+                    }
+                    onOpenProject={hasProject ? () => navigate(`/projects/${ev.projectId}`) : undefined}
+                  />
+                );
+              })}
             </div>
+          )}
+
+          {loadingParticipantStatuses && (
+            <p className="text-xs text-gray-500 mt-2">Atualizando status da jornada…</p>
           )}
         </section>
 
@@ -310,20 +428,45 @@ export default function Events() {
             <p className="text-sm text-gray-500">Você ainda não tem eventos encerrados.</p>
           ) : (
             <div className="space-y-4">
-              {closedMyEvents.map((ev) => (
-                <EventProgressStatusCard
-                  key={`closed-${ev.eventId}-${ev.projectId ?? "no-project"}`}
-                  eventName={ev.eventName}
-                  projectTitle={ev.projectTitle}
-                  totalWords={ev.totalWrittenInEvent}
-                  targetWords={ev.targetWords}
-                  percent={ev.percent}
-                  remainingWords={ev.remainingWords}
-                  won={ev.won}
-                  onAction={() => navigate(`/events/${ev.eventId}`)}
-                  actionLabel="Detalhes"
-                />
-              ))}
+              {closedMyEvents.map((ev) => {
+                const hasProject = Boolean(ev.projectId);
+                const status = hasProject
+                  ? statusByEntry[makeParticipantStatusKey(ev.eventId, ev.projectId)]
+                  : buildFallbackParticipantStatus({
+                      eventId: ev.eventId,
+                      projectId: null,
+                      eventName: ev.eventName,
+                      projectTitle: ev.projectTitle,
+                      totalWords: ev.totalWrittenInEvent,
+                      targetWords: ev.targetWords,
+                      percent: ev.percent,
+                      remainingWords: ev.remainingWords,
+                      isEventClosed: true,
+                      isEventActive: false,
+                      isWinner: ev.won,
+                    });
+
+                return (
+                  <EventParticipantJourneyCard
+                    key={`closed-${ev.eventId}-${ev.projectId ?? "no-project"}`}
+                    status={status}
+                    onOpenDetails={() => navigate(`/events/${ev.eventId}`)}
+                    onOpenValidate={
+                      hasProject
+                        ? () =>
+                            navigate(`/validate?eventId=${ev.eventId}&projectId=${ev.projectId}`)
+                        : undefined
+                    }
+                    onOpenWinner={
+                      hasProject
+                        ? () =>
+                            navigate(`/winner?eventId=${ev.eventId}&projectId=${ev.projectId}`)
+                        : undefined
+                    }
+                    onOpenProject={hasProject ? () => navigate(`/projects/${ev.projectId}`) : undefined}
+                  />
+                );
+              })}
             </div>
           )}
         </section>
