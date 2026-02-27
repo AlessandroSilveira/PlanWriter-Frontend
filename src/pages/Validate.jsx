@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getProjects } from "../api/projects";
 import { getActiveEvents } from "../api/events";
 import { getValidationStatus, submitValidation } from "../api/validation";
@@ -132,6 +132,10 @@ function countWordsStrict(text) {
 
 export default function Validate() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const requestedProjectId = query.get("projectId") || "";
+  const requestedEventId = query.get("eventId") || "";
   const [projects, setProjects] = useState([]);
   const [events, setEvents] = useState([]);
   const [projectId, setProjectId] = useState("");
@@ -163,11 +167,42 @@ export default function Validate() {
         const [ps, evs] = await Promise.all([getProjects(), getActiveEvents()]);
         if (cancelled) return;
         const list = Array.isArray(ps) ? ps : [];
-        const eventsList = Array.isArray(evs) && evs.length ? evs : [];
+        const activeEventsList = Array.isArray(evs?.items)
+          ? evs.items
+          : Array.isArray(evs)
+            ? evs
+            : [];
+        const hasRequestedEvent = activeEventsList.some(
+          (ev) => String(ev?.id ?? ev?.Id ?? "") === requestedEventId
+        );
+        const eventsList =
+          requestedEventId && !hasRequestedEvent
+            ? [
+                {
+                  id: requestedEventId,
+                  name: "Evento selecionado",
+                },
+                ...activeEventsList,
+              ]
+            : activeEventsList;
+
+        const hasRequestedProject = list.some(
+          (project) => String(project?.id ?? project?.projectId ?? "") === requestedProjectId
+        );
+
         setProjects(list);
         setEvents(eventsList);
-        if (list[0]) setProjectId(list[0].id ?? list[0].projectId);
-        if (eventsList[0]) setEventId(eventsList[0].id ?? eventsList[0].Id);
+        if (requestedProjectId && hasRequestedProject) {
+          setProjectId(requestedProjectId);
+        } else if (list[0]) {
+          setProjectId(list[0].id ?? list[0].projectId);
+        }
+
+        if (requestedEventId) {
+          setEventId(requestedEventId);
+        } else if (eventsList[0]) {
+          setEventId(eventsList[0].id ?? eventsList[0].Id);
+        }
       } catch (e) {
         if (cancelled) return;
         setErr(toFriendlyApiMessage(e, "Falha ao carregar dados para validação."));
@@ -177,7 +212,7 @@ export default function Validate() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedEventId, requestedProjectId]);
 
   useEffect(() => {
     if (!projectId || !eventId) {
@@ -319,7 +354,8 @@ export default function Validate() {
         title: "Validação concluída",
         message: `Projeto validado com ${chosenTotal.toLocaleString("pt-BR")} palavras.`,
         primaryLabel: "OK",
-        onPrimary: () => navigate("/winner"),
+        onPrimary: () =>
+          navigate(`/winner?eventId=${eventId}&projectId=${projectId}`),
       });
     } catch (e) {
       setFeedback({

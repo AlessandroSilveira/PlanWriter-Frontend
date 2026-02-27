@@ -100,6 +100,15 @@ export async function getEventGoodies(eventId, projectId) {
   return data;
 }
 
+export async function getEventParticipantStatus(eventId, projectId) {
+  if (!eventId || !projectId) {
+    throw new Error("eventId e projectId são obrigatórios.");
+  }
+
+  const { data } = await api.get(`/events/${eventId}/projects/${projectId}/participant-status`);
+  return data;
+}
+
 export async function downloadEventCertificate(eventId, projectId) {
   if (!eventId || !projectId) {
     throw new Error("eventId e projectId são obrigatórios.");
