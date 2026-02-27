@@ -6,17 +6,45 @@ import axios from "axios";
 // - Se preferir chamar a API diretamente, defina VITE_API_URL="http://localhost:5000/api" no .env.
 const baseURL =
   import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "/api";
-let inMemoryAccessToken = null;
+const ACCESS_TOKEN_STORAGE_KEY = "pw_access_token";
+
+function readStoredAccessToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+    return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAccessToken(token) {
+  if (typeof window === "undefined") return;
+  try {
+    if (typeof token === "string" && token.trim().length > 0) {
+      window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token.trim());
+      return;
+    }
+    window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let inMemoryAccessToken = readStoredAccessToken();
 
 export function setAccessToken(token) {
-  inMemoryAccessToken =
+  const normalizedToken =
     typeof token === "string" && token.trim().length > 0
       ? token.trim()
       : null;
+  inMemoryAccessToken = normalizedToken;
+  writeStoredAccessToken(normalizedToken);
 }
 
 export function clearAccessToken() {
   inMemoryAccessToken = null;
+  writeStoredAccessToken(null);
 }
 
 export function getAccessToken() {
