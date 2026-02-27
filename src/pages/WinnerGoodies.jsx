@@ -4,6 +4,7 @@ import FeedbackModal from "../components/FeedbackModal.jsx";
 import {
   downloadEventCertificate,
   getEventGoodies,
+  getEventParticipantStatus,
   getMyEvents,
 } from "../api/events";
 
@@ -98,6 +99,192 @@ function normalizeGoodies(data) {
       awardedAt: badge?.awardedAt ?? badge?.AwardedAt ?? null,
     })),
   };
+}
+
+function normalizeParticipantStatus(data) {
+  const allowedValidationSourcesRaw = Array.isArray(data?.allowedValidationSources)
+    ? data.allowedValidationSources
+    : Array.isArray(data?.AllowedValidationSources)
+      ? data.AllowedValidationSources
+      : [];
+
+  return {
+    eventId: data?.eventId ?? data?.EventId ?? "",
+    projectId: data?.projectId ?? data?.ProjectId ?? "",
+    eventName: data?.eventName ?? data?.EventName ?? "Evento",
+    projectTitle: data?.projectTitle ?? data?.ProjectTitle ?? "Projeto",
+    eventStatus: String(data?.eventStatus ?? data?.EventStatus ?? "").toLowerCase(),
+    isEventActive: Boolean(data?.isEventActive ?? data?.IsEventActive),
+    isEventClosed: Boolean(data?.isEventClosed ?? data?.IsEventClosed),
+    eventStartsAtUtc: data?.eventStartsAtUtc ?? data?.EventStartsAtUtc ?? null,
+    eventEndsAtUtc: data?.eventEndsAtUtc ?? data?.EventEndsAtUtc ?? null,
+    validationWindowStartsAtUtc:
+      data?.validationWindowStartsAtUtc ?? data?.ValidationWindowStartsAtUtc ?? null,
+    validationWindowEndsAtUtc:
+      data?.validationWindowEndsAtUtc ?? data?.ValidationWindowEndsAtUtc ?? null,
+    isValidationWindowOpen: Boolean(
+      data?.isValidationWindowOpen ?? data?.IsValidationWindowOpen
+    ),
+    targetWords: Math.max(0, Number(data?.targetWords ?? data?.TargetWords ?? 0)),
+    totalWords: Math.max(0, Number(data?.totalWords ?? data?.TotalWords ?? 0)),
+    percent: Math.max(0, Number(data?.percent ?? data?.Percent ?? 0)),
+    remainingWords: Math.max(0, Number(data?.remainingWords ?? data?.RemainingWords ?? 0)),
+    isValidated: Boolean(data?.isValidated ?? data?.IsValidated),
+    isWinner: Boolean(data?.isWinner ?? data?.IsWinner),
+    isEligible: Boolean(data?.isEligible ?? data?.IsEligible),
+    canValidate: Boolean(data?.canValidate ?? data?.CanValidate),
+    eligibilityStatus: String(
+      data?.eligibilityStatus ?? data?.EligibilityStatus ?? ""
+    ).toLowerCase(),
+    eligibilityMessage: String(
+      data?.eligibilityMessage ?? data?.EligibilityMessage ?? ""
+    ),
+    validationBlockReason:
+      data?.validationBlockReason ?? data?.ValidationBlockReason ?? null,
+    validatedAtUtc: data?.validatedAtUtc ?? data?.ValidatedAtUtc ?? null,
+    validatedWords: Number(data?.validatedWords ?? data?.ValidatedWords ?? 0) || null,
+    validationSource: data?.validationSource ?? data?.ValidationSource ?? null,
+    allowedValidationSources: allowedValidationSourcesRaw.map((item) => String(item)),
+  };
+}
+
+function buildFallbackParticipantStatusFromGoodies(goodies) {
+  const targetWords = Math.max(0, Number(goodies?.targetWords ?? 0));
+  const totalWords = Math.max(0, Number(goodies?.totalWords ?? 0));
+  const remainingWords = Math.max(0, targetWords - totalWords);
+  const percent = targetWords > 0 ? Math.round((totalWords / targetWords) * 100) : 0;
+
+  return {
+    eventId: goodies?.eventId ?? "",
+    projectId: goodies?.projectId ?? "",
+    eventName: goodies?.eventName ?? "Evento",
+    projectTitle: goodies?.projectTitle ?? "Projeto",
+    eventStatus: "",
+    isEventActive: false,
+    isEventClosed: false,
+    eventStartsAtUtc: null,
+    eventEndsAtUtc: null,
+    validationWindowStartsAtUtc: null,
+    validationWindowEndsAtUtc: null,
+    isValidationWindowOpen: false,
+    targetWords,
+    totalWords,
+    percent: Math.max(0, Math.min(100, percent)),
+    remainingWords,
+    isValidated: Boolean(goodies?.validatedAtUtc),
+    isWinner: Boolean(goodies?.won),
+    isEligible: Boolean(goodies?.eligibility?.isEligible),
+    canValidate: Boolean(goodies?.eligibility?.canValidate),
+    eligibilityStatus: String(goodies?.eligibility?.status ?? "").toLowerCase(),
+    eligibilityMessage: String(goodies?.eligibility?.message ?? ""),
+    validationBlockReason: null,
+    validatedAtUtc: goodies?.validatedAtUtc ?? null,
+    validatedWords: null,
+    validationSource: null,
+    allowedValidationSources: [],
+  };
+}
+
+function mergeWinnerData(statusData, goodiesData) {
+  const effectiveStatus = statusData || buildFallbackParticipantStatusFromGoodies(goodiesData);
+  const effectiveGoodies = goodiesData || {
+    certificate: { available: false, downloadUrl: null, message: "" },
+    badges: [],
+  };
+
+  const targetWords = Math.max(
+    0,
+    Number(effectiveStatus?.targetWords ?? effectiveGoodies?.targetWords ?? 0)
+  );
+  const totalWords = Math.max(
+    0,
+    Number(effectiveStatus?.totalWords ?? effectiveGoodies?.totalWords ?? 0)
+  );
+  const remainingWords = Math.max(
+    0,
+    Number(
+      effectiveStatus?.remainingWords ??
+        effectiveGoodies?.remainingWords ??
+        targetWords - totalWords
+    )
+  );
+  const percent = targetWords > 0 ? Math.round((totalWords / targetWords) * 100) : 0;
+
+  const certificateAvailable = Boolean(
+    effectiveGoodies?.certificate?.available ?? effectiveStatus?.isEligible
+  );
+  const certificateMessage = String(
+    effectiveGoodies?.certificate?.message ??
+      (certificateAvailable
+        ? "Certificado liberado para download."
+        : "Certificado bloqueado para esta participação.")
+  );
+
+  return {
+    eventId: effectiveStatus?.eventId ?? effectiveGoodies?.eventId ?? "",
+    projectId: effectiveStatus?.projectId ?? effectiveGoodies?.projectId ?? "",
+    eventName: effectiveStatus?.eventName ?? effectiveGoodies?.eventName ?? "Evento",
+    projectTitle: effectiveStatus?.projectTitle ?? effectiveGoodies?.projectTitle ?? "Projeto",
+    targetWords,
+    totalWords,
+    remainingWords,
+    percent: Math.max(0, Math.min(100, percent)),
+    eventStatus: String(effectiveStatus?.eventStatus ?? ""),
+    isEventActive: Boolean(effectiveStatus?.isEventActive),
+    isEventClosed: Boolean(effectiveStatus?.isEventClosed),
+    isValidationWindowOpen: Boolean(effectiveStatus?.isValidationWindowOpen),
+    validationWindowStartsAtUtc: effectiveStatus?.validationWindowStartsAtUtc ?? null,
+    validationWindowEndsAtUtc: effectiveStatus?.validationWindowEndsAtUtc ?? null,
+    validatedAtUtc: effectiveStatus?.validatedAtUtc ?? effectiveGoodies?.validatedAtUtc ?? null,
+    validatedWords: effectiveStatus?.validatedWords ?? null,
+    validationSource: effectiveStatus?.validationSource ?? null,
+    eligibility: {
+      isEligible: Boolean(effectiveStatus?.isEligible),
+      canValidate: Boolean(effectiveStatus?.canValidate),
+      status: String(
+        effectiveStatus?.eligibilityStatus ?? effectiveGoodies?.eligibility?.status ?? ""
+      ).toLowerCase(),
+      message: String(
+        effectiveStatus?.eligibilityMessage ?? effectiveGoodies?.eligibility?.message ?? ""
+      ),
+    },
+    validationBlockReason: effectiveStatus?.validationBlockReason ?? null,
+    certificate: {
+      available: certificateAvailable,
+      downloadUrl: effectiveGoodies?.certificate?.downloadUrl ?? null,
+      message: certificateMessage,
+    },
+    badges: Array.isArray(effectiveGoodies?.badges) ? effectiveGoodies.badges : [],
+    won: Boolean(effectiveStatus?.isWinner ?? effectiveGoodies?.won),
+    allowedValidationSources: Array.isArray(effectiveStatus?.allowedValidationSources)
+      ? effectiveStatus.allowedValidationSources
+      : [],
+  };
+}
+
+function getGoodieBlockedReason(goodies) {
+  if (!goodies) return "";
+  if (goodies.validationBlockReason) return goodies.validationBlockReason;
+  if (goodies.eligibility.status === "pending_validation") {
+    return "Meta atingida. Faça a validação final para liberar os goodies.";
+  }
+  if (goodies.eligibility.status === "in_progress" && goodies.remainingWords > 0) {
+    return `Faltam ${formatWords(goodies.remainingWords)} palavras para atingir a meta.`;
+  }
+  if (goodies.eligibility.status === "not_eligible") {
+    return "Meta não atingida dentro do período do evento.";
+  }
+  if (goodies.eligibility.status === "invalid_target") {
+    return "A meta do evento está inválida e precisa ser revisada pelo administrador.";
+  }
+  return goodies.eligibility.message || "Item bloqueado para esta participação.";
+}
+
+function getEventStatusLabel(eventStatus, isEventClosed) {
+  if (isEventClosed || eventStatus === "closed" || eventStatus === "disabled") return "Encerrado";
+  if (eventStatus === "active") return "Ativo";
+  if (eventStatus === "scheduled") return "Agendado";
+  return "Aguardando";
 }
 
 function getStatusMeta(status) {
@@ -284,9 +471,36 @@ export default function WinnerGoodies() {
       setLoadingGoodies(true);
       setError("");
       try {
-        const data = await getEventGoodies(eventId, projectId);
+        const [statusResult, goodiesResult] = await Promise.allSettled([
+          getEventParticipantStatus(eventId, projectId),
+          getEventGoodies(eventId, projectId),
+        ]);
         if (cancelled) return;
-        setGoodies(normalizeGoodies(data));
+
+        let normalizedStatus = null;
+        let normalizedGoodies = null;
+
+        if (statusResult.status === "fulfilled") {
+          normalizedStatus = normalizeParticipantStatus(statusResult.value);
+        } else {
+          const statusCode = Number(statusResult.reason?.response?.status ?? 0);
+          if (statusCode !== 404 && statusCode !== 405) {
+            throw statusResult.reason;
+          }
+        }
+
+        if (goodiesResult.status === "fulfilled") {
+          normalizedGoodies = normalizeGoodies(goodiesResult.value);
+        } else if (!normalizedStatus) {
+          throw goodiesResult.reason;
+        }
+
+        const merged = mergeWinnerData(normalizedStatus, normalizedGoodies);
+        if (!merged.eventId || !merged.projectId) {
+          throw new Error("Não foi possível identificar evento e projeto da participação.");
+        }
+
+        setGoodies(merged);
       } catch (fetchError) {
         if (cancelled) return;
         setGoodies(null);
@@ -316,10 +530,21 @@ export default function WinnerGoodies() {
 
   const remainingWords = useMemo(() => {
     if (!goodies) return 0;
-    return Math.max(0, goodies.targetWords - goodies.totalWords);
+    return Math.max(0, goodies.remainingWords ?? goodies.targetWords - goodies.totalWords);
   }, [goodies]);
 
   const statusMeta = useMemo(() => getStatusMeta(goodies?.eligibility?.status), [goodies?.eligibility?.status]);
+  const blockedReason = useMemo(() => getGoodieBlockedReason(goodies), [goodies]);
+  const eventStatusLabel = useMemo(
+    () => getEventStatusLabel(goodies?.eventStatus, goodies?.isEventClosed),
+    [goodies?.eventStatus, goodies?.isEventClosed]
+  );
+  const validationWindowLabel = useMemo(() => {
+    if (!goodies) return "Não informada";
+    if (goodies.isValidationWindowOpen) return "Aberta";
+    if (!goodies.validationWindowStartsAtUtc || !goodies.validationWindowEndsAtUtc) return "Não informada";
+    return "Fechada";
+  }, [goodies]);
 
   const badgeImageUrl = useMemo(() => {
     if (!goodies?.eligibility?.isEligible) return null;
@@ -470,6 +695,16 @@ export default function WinnerGoodies() {
               Progresso: {formatWords(goodies.totalWords)} / {formatWords(goodies.targetWords)} palavras
               {remainingWords > 0 ? ` • faltam ${formatWords(remainingWords)} palavras` : " • meta concluída"}
             </p>
+
+            <p className="mt-1 text-xs text-gray-500">
+              Evento: {eventStatusLabel} • Janela de validação: {validationWindowLabel}
+            </p>
+
+            {goodies.validationBlockReason && (
+              <p className="mt-2 text-xs text-amber-700 font-medium">
+                Motivo do bloqueio: {goodies.validationBlockReason}
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -516,6 +751,12 @@ export default function WinnerGoodies() {
                   Fazer validação final
                 </button>
               )}
+
+              {!goodies.certificate.available && (
+                <p className="text-xs text-amber-700">
+                  {blockedReason}
+                </p>
+              )}
             </div>
           </article>
 
@@ -547,9 +788,12 @@ export default function WinnerGoodies() {
                 Baixar badge (PNG)
               </a>
             ) : (
-              <button type="button" className="button" disabled>
-                Badge bloqueado
-              </button>
+              <div className="space-y-2">
+                <button type="button" className="button" disabled>
+                  Badge bloqueado
+                </button>
+                <p className="text-xs text-amber-700">{blockedReason}</p>
+              </div>
             )}
           </article>
 
@@ -575,9 +819,12 @@ export default function WinnerGoodies() {
                 </a>
               </div>
             ) : (
-              <button type="button" className="button" disabled>
-                Imagem bloqueada
-              </button>
+              <div className="space-y-2">
+                <button type="button" className="button" disabled>
+                  Imagem bloqueada
+                </button>
+                <p className="text-xs text-amber-700">{blockedReason}</p>
+              </div>
             )}
 
             <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
