@@ -256,17 +256,31 @@ export default function EventDetails() {
             Voltar
           </button>
 
-          {myEvent && (
-            <button
-              onClick={async () => {
-                await leaveEvent(eventId, myEvent.projectId);
-                navigate("/events");
-              }}
-              className="px-4 py-2 border rounded-lg text-rose-600"
-            >
-              Sair do evento
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {myEvent && (
+              <button
+                type="button"
+                className="px-4 py-2 border rounded-lg"
+                onClick={() =>
+                  navigate(`/winner?eventId=${eventId}&projectId=${myEvent.projectId}`)
+                }
+              >
+                Central do vencedor
+              </button>
+            )}
+
+            {myEvent && (
+              <button
+                onClick={async () => {
+                  await leaveEvent(eventId, myEvent.projectId);
+                  navigate("/events");
+                }}
+                className="px-4 py-2 border rounded-lg text-rose-600"
+              >
+                Sair do evento
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </header>
