@@ -682,7 +682,7 @@ function buildPdfDocumentFromPages(pages) {
   );
 
   Object.entries(PDF_FONT_RESOURCES).forEach(([key, baseFont]) => {
-    objects.set(fontIds[key], `<< /Type /Font /Subtype /Type1 /BaseFont ${baseFont} >>`);
+    objects.set(fontIds[key], `<< /Type /Font /Subtype /Type1 /BaseFont ${baseFont} /Encoding /WinAnsiEncoding >>`);
   });
 
   const fontResourceList = Object.entries(fontIds)
