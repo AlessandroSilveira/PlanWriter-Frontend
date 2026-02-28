@@ -264,14 +264,9 @@ export default function Dashboard() {
         <div className="container hero-inner">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold">Bem vindo de volta, Escritor.</h1>
-            <div className="flex items-center gap-2">
-              <Link to="/winner" className="button no-underline">
-                Central do vencedor
-              </Link>
-              <button type="button" className="btn-primary" onClick={openNewProjectModal}>
-                + Novo projeto
-              </button>
-            </div>
+            <button type="button" className="btn-primary" onClick={openNewProjectModal}>
+              + Novo projeto
+            </button>
           </div>
 
           {error && <p className="text-red-600 mt-2">{error}</p>}
