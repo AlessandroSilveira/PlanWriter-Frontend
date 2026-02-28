@@ -790,7 +790,7 @@ export default function FocusEditor() {
             onClick={() => handleExport("doc")}
             disabled={!plainText.trim()}
           >
-            Exportar DOC
+            Exportar DOCX
           </button>
           <button
             type="button"
