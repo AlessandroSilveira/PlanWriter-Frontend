@@ -4,6 +4,7 @@ import FeedbackModal from "../components/FeedbackModal.jsx";
 import { saveSprintProgress } from "../api/progress";
 import { getProjects } from "../api/projects";
 import { isOngoing } from "../utils/overviewAggregation";
+import { exportTextAsDoc, exportTextAsPdf, exportTextAsTxt } from "../utils/exportText.js";
 
 
 /* util simples de contagem de palavras */
@@ -57,6 +58,7 @@ export default function WordSprint() {
   const words = useMemo(() => countWords(text), [text]);
   const written = Math.max(0, words - baseline);
   const pct = Math.min(100, Math.round((written / Math.max(1, goal)) * 100));
+  const hasExportableText = text.trim().length > 0;
 
   const openFeedback = useCallback(
     (type, title, message, primaryLabel = "OK") => {
@@ -205,6 +207,34 @@ export default function WordSprint() {
       "Sprint salvo localmente",
       "O histórico da sessão foi salvo no seu navegador."
     );
+  };
+
+  const handleExport = (format) => {
+    if (!hasExportableText) {
+      openFeedback(
+        "warning",
+        "Nada para exportar",
+        "Digite ou cole um texto antes de exportar o conteúdo do Word Sprint."
+      );
+      return;
+    }
+
+    const selectedProject = projects.find(
+      (project) => String(project.id ?? project.projectId) === String(selectedProjectId)
+    );
+    const title = selectedProject?.title ?? selectedProject?.name ?? "Word Sprint";
+
+    if (format === "txt") {
+      exportTextAsTxt(text);
+      return;
+    }
+
+    if (format === "doc") {
+      exportTextAsDoc(text, undefined, title);
+      return;
+    }
+
+    exportTextAsPdf(text, undefined, title);
   };
 
   /* =========================
@@ -362,6 +392,27 @@ export default function WordSprint() {
             onClick={() => navigator.clipboard?.writeText(text)}
           >
             Copiar texto
+          </button>
+          <button
+            className="button"
+            onClick={() => handleExport("txt")}
+            disabled={!hasExportableText}
+          >
+            Exportar TXT
+          </button>
+          <button
+            className="button"
+            onClick={() => handleExport("doc")}
+            disabled={!hasExportableText}
+          >
+            Exportar DOC
+          </button>
+          <button
+            className="button"
+            onClick={() => handleExport("pdf")}
+            disabled={!hasExportableText}
+          >
+            Exportar PDF
           </button>
 
           {finished && (
