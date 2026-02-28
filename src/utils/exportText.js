@@ -169,52 +169,502 @@ function toPdfLiteralString(value) {
   return text;
 }
 
-function buildPdfBlob(text, title) {
+const PDF_FONT_RESOURCES = {
+  F1: "/Helvetica",
+  F2: "/Helvetica-Bold",
+  F3: "/Helvetica-Oblique",
+  F4: "/Helvetica-BoldOblique",
+  F5: "/Courier",
+};
+
+let pdfMeasureContext = null;
+
+function getPdfMeasureContext() {
+  if (typeof document === "undefined") return null;
+  if (pdfMeasureContext) return pdfMeasureContext;
+
+  const canvas = document.createElement("canvas");
+  pdfMeasureContext = canvas.getContext("2d");
+  return pdfMeasureContext;
+}
+
+function getPdfFontKey(format = {}) {
+  if (format.code) return "F5";
+  if (format.bold && format.italic) return "F4";
+  if (format.bold) return "F2";
+  if (format.italic) return "F3";
+  return "F1";
+}
+
+function getPdfFontSize(format = {}, fallback = 12) {
+  return Number(format.sizeHalfPoints) > 0 ? Number(format.sizeHalfPoints) / 2 : fallback;
+}
+
+function buildPdfCanvasFont(format = {}, fallback = 12) {
+  const fontSize = getPdfFontSize(format, fallback);
+
+  if (format.code) {
+    return `${fontSize}px "Courier New", monospace`;
+  }
+
+  const style = format.italic ? "italic " : "";
+  const weight = format.bold ? "700 " : "400 ";
+  return `${style}${weight}${fontSize}px Helvetica, Arial, sans-serif`;
+}
+
+function measurePdfText(text, format = {}, fallback = 12) {
+  const value = String(text ?? "");
+  if (!value) return 0;
+
+  const context = getPdfMeasureContext();
+  if (context) {
+    context.font = buildPdfCanvasFont(format, fallback);
+    return context.measureText(value).width;
+  }
+
+  const fontSize = getPdfFontSize(format, fallback);
+  if (format.code) return value.length * fontSize * 0.6;
+
+  let total = 0;
+  for (const char of value) {
+    if (char === " ") total += fontSize * 0.28;
+    else if (/[ilIjtf]/.test(char)) total += fontSize * 0.28;
+    else if (/[mwMW@#%&]/.test(char)) total += fontSize * 0.82;
+    else total += fontSize * 0.56;
+  }
+
+  return total;
+}
+
+function hexToPdfRgb(color, fallback = [0, 0, 0]) {
+  const normalized = normalizeHexColor(color);
+  if (!normalized) return fallback;
+
+  return [0, 2, 4].map((offset) =>
+    Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255
+  );
+}
+
+function pdfRgbCommand(color, operator = "rg", fallback = [0, 0, 0]) {
+  const [r, g, b] = hexToPdfRgb(color, fallback);
+  return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} ${operator}`;
+}
+
+function trimPdfWhitespaceSegments(segments, preserveWhitespace = false) {
+  if (preserveWhitespace) {
+    return segments.map((segment) => ({ ...segment }));
+  }
+
+  const normalized = segments.map((segment) => ({ ...segment }));
+
+  while (normalized.length && !normalized[0].lineBreak && /^\s+$/.test(normalized[0].text)) {
+    normalized.shift();
+  }
+
+  while (
+    normalized.length &&
+    !normalized[normalized.length - 1].lineBreak &&
+    /^\s+$/.test(normalized[normalized.length - 1].text)
+  ) {
+    normalized.pop();
+  }
+
+  return normalized;
+}
+
+function mergePdfSegments(segments) {
+  return segments.reduce((result, segment) => {
+    if (!segment) return result;
+    if (segment.lineBreak) {
+      result.push({ lineBreak: true });
+      return result;
+    }
+
+    const value = String(segment.text ?? "");
+    if (!value) return result;
+
+    const current = { ...segment, text: value };
+    const previous = result[result.length - 1];
+
+    if (
+      previous &&
+      !previous.lineBreak &&
+      previous.bold === current.bold &&
+      previous.italic === current.italic &&
+      previous.underline === current.underline &&
+      previous.strike === current.strike &&
+      previous.superscript === current.superscript &&
+      previous.subscript === current.subscript &&
+      previous.code === current.code &&
+      previous.color === current.color &&
+      previous.highlightColor === current.highlightColor &&
+      previous.sizeHalfPoints === current.sizeHalfPoints
+    ) {
+      previous.text += current.text;
+      return result;
+    }
+
+    result.push(current);
+    return result;
+  }, []);
+}
+
+function createPdfParagraphBlock(segments, options = {}) {
+  return {
+    type: "paragraph",
+    segments: mergePdfSegments(segments),
+    alignment: options.alignment ?? "left",
+    indentLeft: options.indentLeft ?? 0,
+    blockGap: options.blockGap ?? 14,
+    lineHeightMultiplier: options.lineHeightMultiplier ?? 1.45,
+    preserveWhitespace: options.preserveWhitespace ?? false,
+    backgroundColor: options.backgroundColor ?? null,
+  };
+}
+
+function createPdfRuleBlock(options = {}) {
+  return {
+    type: "rule",
+    indentLeft: options.indentLeft ?? 0,
+    blockGap: options.blockGap ?? 16,
+    color: options.color ?? "C9B39B",
+  };
+}
+
+function collectPdfSegmentsFromNodes(nodes, format = {}, options = {}) {
+  return nodes.flatMap((node) => collectPdfSegments(node, format, options));
+}
+
+function collectPdfSegments(node, format = {}, options = {}) {
+  if (!node) return [];
+
+  if (node.nodeType === 3) {
+    let value = String(node.nodeValue ?? "").replace(/\u00a0/g, " ");
+    if (!options.preserveWhitespace) {
+      value = value.replace(/\r?\n/g, " ");
+    }
+
+    return value ? [{ ...format, text: value }] : [];
+  }
+
+  if (node.nodeType !== 1) return [];
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === "br") return [{ lineBreak: true }];
+
+  if (tag === "img") {
+    const label =
+      node.getAttribute("alt")?.trim() || node.getAttribute("src")?.trim() || "Imagem";
+
+    return [
+      {
+        ...format,
+        italic: true,
+        color: "666666",
+        text: `[${label}]`,
+      },
+    ];
+  }
+
+  const nextFormat = applyInlineFormatting(node, format);
+  return collectPdfSegmentsFromNodes(Array.from(node.childNodes), nextFormat, options);
+}
+
+function listItemToPdfBlocks(item, prefix, depth = 0) {
+  const children = Array.from(item.childNodes);
+  const nestedLists = children.filter(
+    (child) => child.nodeType === 1 && ["ul", "ol"].includes(child.tagName.toLowerCase())
+  );
+  const inlineNodes = children.filter(
+    (child) => !(child.nodeType === 1 && ["ul", "ol"].includes(child.tagName.toLowerCase()))
+  );
+
+  const blocks = [
+    createPdfParagraphBlock(
+      [{ text: prefix }, ...collectPdfSegmentsFromNodes(inlineNodes)],
+      {
+        indentLeft: 20 + depth * 16,
+        blockGap: 10,
+      }
+    ),
+  ];
+
+  nestedLists.forEach((list) => {
+    blocks.push(...listToPdfBlocks(list, list.tagName.toLowerCase() === "ol", depth + 1));
+  });
+
+  return blocks;
+}
+
+function listToPdfBlocks(list, ordered, depth = 0) {
+  const items = Array.from(list.children).filter(
+    (child) => child.nodeType === 1 && child.tagName.toLowerCase() === "li"
+  );
+
+  return items.flatMap((item, index) =>
+    listItemToPdfBlocks(item, ordered ? `${index + 1}. ` : "• ", depth)
+  );
+}
+
+function nodeToPdfBlocks(node) {
+  if (!node) return [];
+
+  if (node.nodeType === 3) {
+    const value = String(node.nodeValue ?? "").trim();
+    return value ? [createPdfParagraphBlock([{ text: value }], { blockGap: 12 })] : [];
+  }
+
+  if (node.nodeType !== 1) return [];
+
+  const tag = node.tagName.toLowerCase();
+  const children = Array.from(node.childNodes);
+  const alignment = getAlignment(node) ?? "left";
+
+  if (tag === "ul" || tag === "ol") {
+    return listToPdfBlocks(node, tag === "ol");
+  }
+
+  if (tag === "pre") {
+    return normalizeText(node.textContent)
+      .split("\n")
+      .map((line) =>
+        createPdfParagraphBlock([{ text: line || " ", code: true }], {
+          indentLeft: 14,
+          blockGap: 6,
+          lineHeightMultiplier: 1.35,
+          preserveWhitespace: true,
+          backgroundColor: "F7F3EC",
+        })
+      );
+  }
+
+  if (tag === "blockquote") {
+    return [
+      createPdfParagraphBlock(
+        collectPdfSegmentsFromNodes(children, { italic: true, color: "4B5563" }),
+        {
+          indentLeft: 24,
+          blockGap: 14,
+          lineHeightMultiplier: 1.45,
+          alignment,
+        }
+      ),
+    ];
+  }
+
+  if (tag === "hr") {
+    return [createPdfRuleBlock()];
+  }
+
+  if (tag === "h1") {
+    return [
+      createPdfParagraphBlock(
+        collectPdfSegmentsFromNodes(children, { bold: true, sizeHalfPoints: 34 }),
+        {
+          blockGap: 14,
+          lineHeightMultiplier: 1.2,
+          alignment,
+        }
+      ),
+    ];
+  }
+
+  if (tag === "h2") {
+    return [
+      createPdfParagraphBlock(
+        collectPdfSegmentsFromNodes(children, { bold: true, sizeHalfPoints: 28 }),
+        {
+          blockGap: 12,
+          lineHeightMultiplier: 1.25,
+          alignment,
+        }
+      ),
+    ];
+  }
+
+  if (tag === "div") {
+    const hasBlockChildren = children.some(
+      (child) =>
+        child.nodeType === 1 &&
+        ["p", "div", "h1", "h2", "blockquote", "pre", "ul", "ol", "hr"].includes(
+          child.tagName.toLowerCase()
+        )
+    );
+
+    if (hasBlockChildren) {
+      return children.flatMap((child) => nodeToPdfBlocks(child));
+    }
+  }
+
+  return [
+    createPdfParagraphBlock(collectPdfSegmentsFromNodes(children), {
+      blockGap: 12,
+      lineHeightMultiplier: 1.45,
+      alignment,
+    }),
+  ];
+}
+
+function htmlToPdfBlocks(html) {
+  const sanitized = sanitizeRichTextHtml(html);
+
+  if (typeof DOMParser === "undefined") {
+    return normalizeText(sanitized.replace(/<[^>]+>/g, " "))
+      .split("\n")
+      .map((line) => createPdfParagraphBlock([{ text: line || " " }], { blockGap: 12 }));
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${sanitized}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+
+  if (!root) {
+    return [createPdfParagraphBlock([{ text: " " }])];
+  }
+
+  const blocks = Array.from(root.childNodes).flatMap((node) => nodeToPdfBlocks(node));
+  return blocks.length ? blocks : [createPdfParagraphBlock([{ text: " " }])];
+}
+
+function splitPdfTokenToFit(text, format, maxWidth, fallback = 12) {
+  if (!text) return "";
+
+  let piece = "";
+  for (const char of text) {
+    const candidate = `${piece}${char}`;
+    if (measurePdfText(candidate, format, fallback) <= maxWidth || !piece) {
+      piece = candidate;
+      continue;
+    }
+
+    break;
+  }
+
+  return piece || text[0];
+}
+
+function tokenizePdfText(text, preserveWhitespace = false) {
+  const value = String(text ?? "");
+  if (!value) return [];
+
+  const pattern = preserveWhitespace ? /[^\S\n]+|\n|[^\s\n]+/g : /\S+|\s+/g;
+  return value.match(pattern) ?? [];
+}
+
+function layoutPdfParagraph(block, availableWidth) {
+  const lines = [];
+  let current = [];
+  let currentWidth = 0;
+
+  const commitLine = (force = false) => {
+    const segments = trimPdfWhitespaceSegments(current, block.preserveWhitespace);
+    if (segments.length || force || !lines.length) {
+      const width = segments.reduce(
+        (sum, segment) => sum + (segment.lineBreak ? 0 : measurePdfText(segment.text, segment)),
+        0
+      );
+      lines.push({ segments, width });
+    }
+    current = [];
+    currentWidth = 0;
+  };
+
+  const pushSegment = (segment) => {
+    const width = measurePdfText(segment.text, segment);
+    current.push(segment);
+    currentWidth += width;
+  };
+
+  for (const segment of block.segments) {
+    if (segment.lineBreak) {
+      commitLine(true);
+      continue;
+    }
+
+    const tokens = tokenizePdfText(segment.text, block.preserveWhitespace);
+    for (const token of tokens) {
+      if (token === "\n") {
+        commitLine(true);
+        continue;
+      }
+
+      const whitespace = /^\s+$/.test(token);
+      let remaining = whitespace && !block.preserveWhitespace ? " " : token;
+      if (!remaining) continue;
+
+      while (remaining) {
+        if (/^\s+$/.test(remaining) && current.length === 0) {
+          remaining = "";
+          break;
+        }
+
+        const targetWidth = current.length ? availableWidth - currentWidth : availableWidth;
+        const remainingWidth = measurePdfText(remaining, segment);
+
+        if (remainingWidth <= targetWidth && remainingWidth <= availableWidth) {
+          pushSegment({ ...segment, text: remaining });
+          remaining = "";
+          continue;
+        }
+
+        if (/^\s+$/.test(remaining)) {
+          commitLine();
+          remaining = "";
+          continue;
+        }
+
+        const fitWidth = targetWidth > 0 ? targetWidth : availableWidth;
+        const chunk = splitPdfTokenToFit(remaining, segment, fitWidth);
+
+        if (!chunk) {
+          if (current.length) {
+            commitLine();
+            continue;
+          }
+
+          pushSegment({ ...segment, text: remaining[0] });
+          remaining = remaining.slice(1);
+          commitLine();
+          continue;
+        }
+
+        pushSegment({ ...segment, text: chunk });
+        remaining = remaining.slice(chunk.length);
+
+        if (remaining) {
+          commitLine();
+        }
+      }
+    }
+  }
+
+  if (current.length || !lines.length) {
+    commitLine();
+  }
+
+  return lines;
+}
+
+function getPdfLineHeight(line, block) {
+  const maxFontSize = Math.max(
+    12,
+    ...line.segments.map((segment) => getPdfFontSize(segment, 12))
+  );
+  return maxFontSize * (block.lineHeightMultiplier ?? 1.45);
+}
+
+function buildPdfDocumentFromPages(pages) {
   const encoder = new TextEncoder();
   const pageWidth = 595;
   const pageHeight = 842;
-  const top = 792;
-  const left = 48;
-  const bottom = 56;
-
-  const entries = [
-    { text: title, fontSize: 16, step: 24 },
-    {
-      text: `Exportado em ${new Date().toLocaleString("pt-BR")}`,
-      fontSize: 10,
-      step: 20,
-    },
-    { text: "", fontSize: 12, step: 16 },
-    ...normalizeText(text)
-      .split("\n")
-      .flatMap((line) => wrapLine(line, 86))
-      .map((line) => ({ text: line, fontSize: 12, step: 16 })),
-  ];
-
-  const pages = [];
-  let current = [];
-  let y = top;
-
-  for (const entry of entries) {
-    if (y < bottom) {
-      pages.push(current);
-      current = [];
-      y = top;
-    }
-
-    current.push({ ...entry, y });
-    y -= entry.step;
-  }
-
-  if (current.length) {
-    pages.push(current);
-  }
-
   const objects = new Map();
   const catalogId = 1;
   const pagesId = 2;
-  const fontId = 3;
-  let nextId = 4;
+  let nextId = 3;
+
+  const fontIds = Object.fromEntries(
+    Object.keys(PDF_FONT_RESOURCES).map((key) => [key, nextId++])
+  );
 
   const contentIds = [];
   const pageIds = [];
@@ -230,18 +680,17 @@ function buildPdfBlob(text, title) {
       .map((id) => `${id} 0 R`)
       .join(" ")}] >>`
   );
-  objects.set(fontId, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`);
+
+  Object.entries(PDF_FONT_RESOURCES).forEach(([key, baseFont]) => {
+    objects.set(fontIds[key], `<< /Type /Font /Subtype /Type1 /BaseFont ${baseFont} >>`);
+  });
+
+  const fontResourceList = Object.entries(fontIds)
+    .map(([key, id]) => `/${key} ${id} 0 R`)
+    .join(" ");
 
   pages.forEach((page, index) => {
-    const stream = page
-      .map(
-        (line) =>
-          `BT\n/F1 ${line.fontSize} Tf\n1 0 0 1 ${left} ${line.y} Tm\n${toPdfLiteralString(
-            line.text
-          )} Tj\nET`
-      )
-      .join("\n");
-
+    const stream = page.join("\n");
     const contentId = contentIds[index];
     const pageId = pageIds[index];
 
@@ -251,7 +700,7 @@ function buildPdfBlob(text, title) {
     );
     objects.set(
       pageId,
-      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << ${fontResourceList} >> >> /Contents ${contentId} 0 R >>`
     );
   });
 
@@ -272,6 +721,172 @@ function buildPdfBlob(text, title) {
   pdf += `trailer\n<< /Size ${ids.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
 
   return new Blob([pdf], { type: "application/pdf" });
+}
+
+function buildRichPdfBlobFromBlocks(blocks) {
+  const pageWidth = 595;
+  const top = 792;
+  const left = 48;
+  const right = 48;
+  const bottom = 56;
+  const contentWidth = pageWidth - left - right;
+
+  const pages = [[]];
+  let currentPage = pages[0];
+  let y = top;
+
+  const ensurePage = (requiredHeight = 16) => {
+    if (y - requiredHeight >= bottom) return;
+    currentPage = [];
+    pages.push(currentPage);
+    y = top;
+  };
+
+  blocks.forEach((block) => {
+    if (block.type === "rule") {
+      ensurePage(18);
+      const lineY = y - 4;
+      const startX = left + block.indentLeft;
+      const endX = pageWidth - right;
+      currentPage.push(
+        `${pdfRgbCommand(block.color, "RG")} 0.8 w ${startX.toFixed(2)} ${lineY.toFixed(2)} m ${endX.toFixed(2)} ${lineY.toFixed(2)} l S`
+      );
+      y -= block.blockGap;
+      return;
+    }
+
+    const availableWidth = contentWidth - block.indentLeft;
+    const lines = layoutPdfParagraph(block, availableWidth);
+
+    lines.forEach((line, index) => {
+      const lineHeight = getPdfLineHeight(line, block);
+      ensurePage(lineHeight + 4);
+
+      const freeSpace = Math.max(0, availableWidth - line.width);
+      const offsetX =
+        block.alignment === "center"
+          ? freeSpace / 2
+          : block.alignment === "right"
+          ? freeSpace
+          : 0;
+
+      let x = left + block.indentLeft + offsetX;
+      const baselineY = y;
+
+      if (block.backgroundColor) {
+        const rectHeight = Math.max(lineHeight * 0.88, 16);
+        const rectY = baselineY - rectHeight * 0.72;
+        currentPage.push(
+          `${pdfRgbCommand(block.backgroundColor)} ${(left + block.indentLeft - 4).toFixed(2)} ${rectY.toFixed(2)} ${(availableWidth + 8).toFixed(2)} ${rectHeight.toFixed(2)} re f`
+        );
+      }
+
+      line.segments.forEach((segment) => {
+        const value = String(segment.text ?? "");
+        if (!value) return;
+
+        const fontKey = getPdfFontKey(segment);
+        const fontSize = getPdfFontSize(segment, 12);
+        const textWidth = measurePdfText(value, segment, 12);
+        const textColor = segment.color ?? "000000";
+        const baselineOffset = segment.superscript
+          ? fontSize * 0.32
+          : segment.subscript
+          ? -fontSize * 0.18
+          : 0;
+        const textY = baselineY + baselineOffset;
+
+        if (segment.highlightColor) {
+          const highlightHeight = Math.max(fontSize * 0.95, 12);
+          const highlightY = textY - fontSize * 0.28;
+          currentPage.push(
+            `${pdfRgbCommand(segment.highlightColor)} ${x.toFixed(2)} ${highlightY.toFixed(2)} ${textWidth.toFixed(2)} ${highlightHeight.toFixed(2)} re f`
+          );
+        }
+
+        currentPage.push(
+          `BT\n/${fontKey} ${fontSize.toFixed(2)} Tf\n${pdfRgbCommand(textColor)}\n1 0 0 1 ${x.toFixed(2)} ${textY.toFixed(2)} Tm\n${toPdfLiteralString(value)} Tj\nET`
+        );
+
+        if (segment.underline) {
+          const underlineY = textY - Math.max(1.1, fontSize * 0.14);
+          currentPage.push(
+            `${pdfRgbCommand(textColor, "RG")} 0.7 w ${x.toFixed(2)} ${underlineY.toFixed(2)} m ${(x + textWidth).toFixed(2)} ${underlineY.toFixed(2)} l S`
+          );
+        }
+
+        if (segment.strike) {
+          const strikeY = textY + fontSize * 0.28;
+          currentPage.push(
+            `${pdfRgbCommand(textColor, "RG")} 0.7 w ${x.toFixed(2)} ${strikeY.toFixed(2)} m ${(x + textWidth).toFixed(2)} ${strikeY.toFixed(2)} l S`
+          );
+        }
+
+        x += textWidth;
+      });
+
+      y -= lineHeight;
+      if (index === lines.length - 1) {
+        y -= block.blockGap;
+      }
+    });
+  });
+
+  const normalizedPages = pages.filter((page) => page.length);
+  return buildPdfDocumentFromPages(normalizedPages.length ? normalizedPages : [[]]);
+}
+
+function buildPdfBlob(text, title) {
+  const blocks = [
+    createPdfParagraphBlock([{ text: title, bold: true, sizeHalfPoints: 32 }], {
+      blockGap: 12,
+      lineHeightMultiplier: 1.25,
+    }),
+    createPdfParagraphBlock(
+      [
+        {
+          text: `Exportado em ${new Date().toLocaleString("pt-BR")}`,
+          color: "666666",
+          sizeHalfPoints: 20,
+        },
+      ],
+      {
+        blockGap: 18,
+        lineHeightMultiplier: 1.2,
+      }
+    ),
+    ...normalizeText(text)
+      .split("\n")
+      .flatMap((line) => wrapLine(line, 86))
+      .map((line) => createPdfParagraphBlock([{ text: line || " " }], { blockGap: 8 })),
+  ];
+
+  return buildRichPdfBlobFromBlocks(blocks);
+}
+
+function buildRichPdfBlob(html, title) {
+  const blocks = [
+    createPdfParagraphBlock([{ text: title, bold: true, sizeHalfPoints: 32 }], {
+      blockGap: 12,
+      lineHeightMultiplier: 1.25,
+    }),
+    createPdfParagraphBlock(
+      [
+        {
+          text: `Exportado em ${new Date().toLocaleString("pt-BR")}`,
+          color: "666666",
+          sizeHalfPoints: 20,
+        },
+      ],
+      {
+        blockGap: 18,
+        lineHeightMultiplier: 1.2,
+      }
+    ),
+    ...htmlToPdfBlocks(html),
+  ];
+
+  return buildRichPdfBlobFromBlocks(blocks);
 }
 
 function sanitizeRichTextHtml(html) {
@@ -462,8 +1077,12 @@ function applyInlineFormatting(node, baseFormat = {}) {
   const color = normalizeHexColor(node.style?.color || node.getAttribute("color"));
   if (color) next.color = color;
 
-  const highlight = toWordHighlight(node.style?.backgroundColor);
+  const backgroundColor = node.style?.backgroundColor;
+  const highlight = toWordHighlight(backgroundColor);
   if (highlight) next.highlight = highlight;
+
+  const highlightColor = normalizeHexColor(backgroundColor);
+  if (highlightColor) next.highlightColor = highlightColor;
 
   if (/(bold|[5-9]00)/i.test(node.style?.fontWeight || "")) next.bold = true;
   if (/italic/i.test(node.style?.fontStyle || "")) next.italic = true;
@@ -880,5 +1499,14 @@ export function exportTextAsPdf(
   title = "Word Sprint"
 ) {
   const blob = buildPdfBlob(text, title);
+  triggerDownload(filename, blob);
+}
+
+export function exportHtmlAsPdf(
+  html,
+  filename = buildSprintFilename("pdf"),
+  title = "Word Sprint"
+) {
+  const blob = buildRichPdfBlob(html, title);
   triggerDownload(filename, blob);
 }
