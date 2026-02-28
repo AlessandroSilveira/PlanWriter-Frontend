@@ -23,6 +23,7 @@ import Validate from "./pages/Validate.jsx";
 import WinnerGoodies from "./pages/WinnerGoodies.jsx";
 import Certificate from "./pages/Certificate.jsx";
 import WordSprint from "./pages/WordSprint.jsx";
+import FocusEditor from "./pages/FocusEditor.jsx";
 import ProfileMe from "./pages/ProfileMe.jsx";
 import PublicProfile from "./pages/PublicProfile.jsx";
 import Resources from "./pages/Resources.jsx";
@@ -116,7 +117,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RequirePasswordChange>
-                <Navigate to="/sprint" replace />
+                <Navigate to="/editor" replace />
               </RequirePasswordChange>
             </ProtectedRoute>
           }
@@ -128,6 +129,17 @@ export default function App() {
             <ProtectedRoute>
               <RequirePasswordChange>
                 <WordSprint />
+              </RequirePasswordChange>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/editor"
+          element={
+            <ProtectedRoute>
+              <RequirePasswordChange>
+                <FocusEditor />
               </RequirePasswordChange>
             </ProtectedRoute>
           }
