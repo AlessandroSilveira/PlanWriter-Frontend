@@ -405,7 +405,7 @@ export default function WordSprint() {
             onClick={() => handleExport("doc")}
             disabled={!hasExportableText}
           >
-            Exportar DOC
+            Exportar DOCX
           </button>
           <button
             className="button"
