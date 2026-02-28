@@ -17,7 +17,7 @@ import WritingHeatmap from "../components/WritingHeatmap.jsx";
 import TodayTargetCard from "../components/TodayTargetCard.jsx";
 import RecentBadges from "../components/RecentBadges.jsx";
 import ProjectForm from "../components/ProjectForm.jsx";
-import { isOngoing } from "../utils/overviewAggregation";
+import { isOngoing, toYMDLocal } from "../utils/overviewAggregation";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -144,7 +144,7 @@ export default function Dashboard() {
                 );
                 if (d < start || d > end) return;
 
-                const key = d.toISOString().slice(0, 10);
+                const key = toYMDLocal(d);
                 const add = Number(
                   h.wordsWritten ?? h.WordsWritten ?? h.words ?? 0
                 ) || 0;
@@ -169,16 +169,16 @@ export default function Dashboard() {
         for (let i = 0; i < totalDays; i++) {
           const d = new Date(gridStart);
           d.setDate(gridStart.getDate() + i);
-          const key = d.toISOString().slice(0, 10);
+          const key = toYMDLocal(d);
           days.push({ date: key, value: map.get(key) || 0 });
         }
 
-        const todayKey = end.toISOString().slice(0, 10);
+        const todayKey = toYMDLocal(end);
         let streak = 0;
         const probe = new Date(end);
 
         while (true) {
-          const k = probe.toISOString().slice(0, 10);
+          const k = toYMDLocal(probe);
           const v = map.get(k) || 0;
           if (v > 0) {
             streak++;
