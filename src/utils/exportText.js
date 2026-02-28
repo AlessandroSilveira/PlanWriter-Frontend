@@ -39,7 +39,9 @@ function escapeHtml(value) {
 }
 
 function normalizeText(text) {
-  return String(text ?? "").replace(/\r\n/g, "\n");
+  return String(text ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n");
 }
 
 function wrapLine(line, maxChars = 86) {
@@ -203,6 +205,65 @@ function buildPdfBlob(text, title) {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
+function buildDocHtml(content, title) {
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body { font-family: Georgia, serif; margin: 32px; color: #1f2937; }
+      h1 { margin-bottom: 8px; }
+      p.meta { color: #555; margin-bottom: 24px; }
+      article { font-size: 12pt; line-height: 1.7; }
+      article h1, article h2 { margin-top: 24px; margin-bottom: 12px; }
+      article p { margin: 0 0 14px; }
+      article ul, article ol { margin: 0 0 16px 24px; }
+      article blockquote {
+        margin: 0 0 16px;
+        padding-left: 16px;
+        border-left: 4px solid #caa46b;
+        color: #374151;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(title)}</h1>
+    <p class="meta">Exportado em ${escapeHtml(new Date().toLocaleString("pt-BR"))}</p>
+    <article>${content}</article>
+  </body>
+</html>`;
+}
+
+function sanitizeRichTextHtml(html) {
+  const raw = String(html ?? "").trim();
+  if (!raw) return "<p></p>";
+
+  if (typeof DOMParser === "undefined") {
+    return `<p>${escapeHtml(raw)}</p>`;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${raw}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+
+  if (!root) {
+    return "<p></p>";
+  }
+
+  root.querySelectorAll("script, style").forEach((node) => node.remove());
+  root.querySelectorAll("*").forEach((node) => {
+    Array.from(node.attributes).forEach((attribute) => {
+      if (/^on/i.test(attribute.name)) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return root.innerHTML || "<p></p>";
+}
+
 export function exportTextAsTxt(text, filename = buildSprintFilename("txt")) {
   const blob = new Blob([normalizeText(text)], {
     type: "text/plain;charset=utf-8",
@@ -215,32 +276,25 @@ export function exportTextAsDoc(
   filename = buildSprintFilename("doc"),
   title = "Word Sprint"
 ) {
-  const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(title)}</title>
-    <style>
-      body { font-family: Georgia, serif; margin: 32px; }
-      h1 { margin-bottom: 8px; }
-      p.meta { color: #555; margin-bottom: 24px; }
-      pre {
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-family: Georgia, serif;
-        font-size: 12pt;
-        line-height: 1.6;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>${escapeHtml(title)}</h1>
-    <p class="meta">Exportado em ${escapeHtml(new Date().toLocaleString("pt-BR"))}</p>
-    <pre>${escapeHtml(normalizeText(text))}</pre>
-  </body>
-</html>`;
+  const html = buildDocHtml(
+    `<pre style="white-space: pre-wrap; word-break: break-word; font-family: Georgia, serif; margin: 0;">${escapeHtml(
+      normalizeText(text)
+    )}</pre>`,
+    title
+  );
 
   const blob = new Blob(["\ufeff", html], {
+    type: "application/msword;charset=utf-8",
+  });
+  triggerDownload(filename, blob);
+}
+
+export function exportHtmlAsDoc(
+  html,
+  filename = buildSprintFilename("doc"),
+  title = "Word Sprint"
+) {
+  const blob = new Blob(["\ufeff", buildDocHtml(sanitizeRichTextHtml(html), title)], {
     type: "application/msword;charset=utf-8",
   });
   triggerDownload(filename, blob);
