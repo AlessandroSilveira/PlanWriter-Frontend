@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getActiveEvents, getEventProjectProgress } from "../api/events";
 import { getProjectHistory } from "../api/projects";
+import { toYMDLocal } from "../utils/overviewAggregation";
 
 /**
  * Mostra: Hoje, Meta de hoje, Faltam (hoje), Modo (Evento ou Projeto).
@@ -29,11 +30,11 @@ export default function TodayTargetCard({ project }) {
       try {
         const hist = await getProjectHistory(projectId);
         const now = new Date(); now.setHours(0,0,0,0);
-        const key = now.toISOString().slice(0,10);
+        const key = toYMDLocal(now);
         const v = (hist || [])
           .filter(h => {
             const d = new Date(h.date || h.Date || h.createdAt || h.CreatedAt);
-            return d.toISOString().slice(0,10) === key;
+            return toYMDLocal(d) === key;
           })
           .reduce((sum, h) => sum + (Number(h.wordsWritten ?? h.WordsWritten ?? h.words ?? 0) || 0), 0);
         setTodayWords(v);
