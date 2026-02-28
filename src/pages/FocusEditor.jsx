@@ -33,7 +33,7 @@ import { addProgress, getProjects } from "../api/projects";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import {
   exportHtmlAsDoc,
-  exportTextAsPdf,
+  exportHtmlAsPdf,
   exportTextAsTxt,
 } from "../utils/exportText.js";
 import { isOngoing } from "../utils/overviewAggregation";
@@ -506,7 +506,7 @@ export default function FocusEditor() {
       return;
     }
 
-    exportTextAsPdf(plainText, undefined, title);
+    exportHtmlAsPdf(contentHtml, undefined, title);
   };
 
   const handleCopyText = async () => {
