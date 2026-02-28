@@ -28,13 +28,12 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
     setFeedback((prev) => ({ ...prev, open: false }));
 
     try {
-      const token = await apiLogin({ email, password });
-
-      if (typeof token !== "string") {
-        throw new Error("Token inválido recebido do servidor.");
+      const authSession = await apiLogin({ email, password });
+      if (!authSession?.accessToken) {
+        throw new Error("Sessão inválida recebida do servidor.");
       }
 
-      const authenticatedUser = login(token);
+      const authenticatedUser = login(authSession);
 
       onClose?.();
       navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
