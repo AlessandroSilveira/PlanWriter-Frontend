@@ -1,4 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Code2,
+  Eraser,
+  Heading1,
+  Heading2,
+  Highlighter,
+  ImagePlus,
+  IndentDecrease,
+  IndentIncrease,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  Minus,
+  Palette,
+  Pilcrow,
+  Quote,
+  Redo2,
+  Strikethrough,
+  Subscript,
+  Superscript,
+  Underline,
+  Undo2,
+  Unlink2,
+} from "lucide-react";
 import { addProgress, getProjects } from "../api/projects";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import {
@@ -61,64 +91,43 @@ function formatDuration(totalSeconds) {
   return `${pad2(hours)}:${pad2(minutes)}:${pad2(remainingSeconds)}`;
 }
 
+function normalizeFontSize(value) {
+  const parsed = String(value ?? "").match(/[1-7]/)?.[0];
+  return parsed ?? "3";
+}
+
 const fmt = (value) => (Number(value) || 0).toLocaleString("pt-BR");
 
 const DEFAULT_TOOLBAR_STATE = {
   bold: false,
   italic: false,
   underline: false,
+  strikeThrough: false,
+  subscript: false,
+  superscript: false,
   unorderedList: false,
   orderedList: false,
+  justifyLeft: true,
+  justifyCenter: false,
+  justifyRight: false,
+  justifyFull: false,
   block: "p",
+  fontSize: "3",
 };
 
-const TOOLBAR_ITEMS = [
-  { key: "undo", label: "Desfazer", command: "undo" },
-  { key: "redo", label: "Refazer", command: "redo" },
-  { key: "bold", label: "B", command: "bold", activeKey: "bold" },
-  { key: "italic", label: "I", command: "italic", activeKey: "italic" },
-  { key: "underline", label: "U", command: "underline", activeKey: "underline" },
-  {
-    key: "paragraph",
-    label: "P",
-    command: "formatBlock",
-    value: "p",
-    activeBlock: "p",
-  },
-  {
-    key: "heading1",
-    label: "H1",
-    command: "formatBlock",
-    value: "h1",
-    activeBlock: "h1",
-  },
-  {
-    key: "heading2",
-    label: "H2",
-    command: "formatBlock",
-    value: "h2",
-    activeBlock: "h2",
-  },
-  {
-    key: "quote",
-    label: "Citação",
-    command: "formatBlock",
-    value: "blockquote",
-    activeBlock: "blockquote",
-  },
-  {
-    key: "unorderedList",
-    label: "Lista",
-    command: "insertUnorderedList",
-    activeKey: "unorderedList",
-  },
-  {
-    key: "orderedList",
-    label: "1.",
-    command: "insertOrderedList",
-    activeKey: "orderedList",
-  },
-  { key: "clear", label: "Limpar estilo", command: "removeFormat" },
+const BLOCK_OPTIONS = [
+  { value: "p", label: "Paragraph" },
+  { value: "h1", label: "Heading 1" },
+  { value: "h2", label: "Heading 2" },
+  { value: "blockquote", label: "Blockquote" },
+  { value: "pre", label: "Code block" },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: "2", label: "Pequeno" },
+  { value: "3", label: "Normal" },
+  { value: "4", label: "Grande" },
+  { value: "5", label: "Maior" },
 ];
 
 async function ensureAudioContext(audioContextRef) {
@@ -142,21 +151,35 @@ async function playCue(audioContextRef) {
   const context = await ensureAudioContext(audioContextRef);
   if (!context) return;
 
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
+  const pulseOffsets = [0, 0.24];
+  const harmonics = [
+    { frequency: 1318.51, gain: 0.14, type: "triangle" },
+    { frequency: 1975.53, gain: 0.06, type: "sine" },
+    { frequency: 2637.02, gain: 0.035, type: "sine" },
+  ];
 
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(880, context.currentTime);
+  for (const offset of pulseOffsets) {
+    for (const harmonic of harmonics) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startAt = context.currentTime + offset;
+      const attackAt = startAt + 0.015;
+      const decayAt = startAt + 0.24;
 
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.22);
+      oscillator.type = harmonic.type;
+      oscillator.frequency.setValueAtTime(harmonic.frequency, startAt);
 
-  oscillator.connect(gain);
-  gain.connect(context.destination);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(harmonic.gain, attackAt);
+      gain.gain.exponentialRampToValueAtTime(0.0001, decayAt);
 
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.24);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+
+      oscillator.start(startAt);
+      oscillator.stop(decayAt + 0.03);
+    }
+  }
 }
 
 function getCurrentBlock(editorRoot) {
@@ -174,10 +197,50 @@ function getCurrentBlock(editorRoot) {
 
   if (!(node instanceof Element)) return "p";
 
-  const block = node.closest("h1, h2, blockquote, ul, ol, p, div");
+  const block = node.closest("h1, h2, blockquote, ul, ol, p, pre, div");
   if (!block) return "p";
   if (block.tagName.toLowerCase() === "div") return "p";
   return block.tagName.toLowerCase();
+}
+
+function ToolbarButton({ icon: Icon, label, active = false, onClick }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      className={`flex h-10 min-w-10 items-center justify-center rounded-lg border transition ${
+        active
+          ? "border-[#2f5d73] bg-[#2f5d73] text-white"
+          : "border-transparent bg-transparent text-[#374151] hover:border-black/10 hover:bg-white"
+      }`}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+    >
+      <Icon size={18} strokeWidth={2.1} />
+    </button>
+  );
+}
+
+function ToolbarSeparator() {
+  return <div className="mx-1 hidden h-7 w-px bg-black/10 md:block" />;
+}
+
+function ToolbarSelect({ value, onChange, options, width = "min-w-[180px]" }) {
+  return (
+    <select
+      className={`h-10 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#374151] outline-none transition focus:border-[#2f5d73] ${width}`}
+      value={value}
+      onMouseDown={(event) => event.preventDefault()}
+      onChange={onChange}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export default function FocusEditor() {
@@ -201,6 +264,8 @@ export default function FocusEditor() {
 
   const audioContextRef = useRef(null);
   const editorRef = useRef(null);
+  const textColorInputRef = useRef(null);
+  const highlightColorInputRef = useRef(null);
   const lastCueSecondRef = useRef(null);
 
   const plainText = useMemo(() => htmlToPlainText(contentHtml), [contentHtml]);
@@ -248,9 +313,17 @@ export default function FocusEditor() {
       bold: document.queryCommandState?.("bold") ?? false,
       italic: document.queryCommandState?.("italic") ?? false,
       underline: document.queryCommandState?.("underline") ?? false,
+      strikeThrough: document.queryCommandState?.("strikeThrough") ?? false,
+      subscript: document.queryCommandState?.("subscript") ?? false,
+      superscript: document.queryCommandState?.("superscript") ?? false,
       unorderedList: document.queryCommandState?.("insertUnorderedList") ?? false,
       orderedList: document.queryCommandState?.("insertOrderedList") ?? false,
+      justifyLeft: document.queryCommandState?.("justifyLeft") ?? true,
+      justifyCenter: document.queryCommandState?.("justifyCenter") ?? false,
+      justifyRight: document.queryCommandState?.("justifyRight") ?? false,
+      justifyFull: document.queryCommandState?.("justifyFull") ?? false,
       block: getCurrentBlock(editor),
+      fontSize: normalizeFontSize(document.queryCommandValue?.("fontSize") ?? "3"),
     });
   }, []);
 
@@ -328,6 +401,10 @@ export default function FocusEditor() {
     refreshToolbarState();
   };
 
+  const focusEditor = () => {
+    editorRef.current?.focus();
+  };
+
   const applyCommand = (command, value = undefined) => {
     const editor = editorRef.current;
     if (!editor || typeof document === "undefined") return;
@@ -338,14 +415,39 @@ export default function FocusEditor() {
       editor.innerHTML = "<p><br></p>";
     }
 
-    if (command === "formatBlock" && value) {
-      document.execCommand(command, false, value);
-    } else {
-      document.execCommand(command, false, value);
-    }
-
+    document.execCommand(command, false, value);
     setContentHtml(normalizeEditorHtml(editor.innerHTML));
     refreshToolbarState();
+  };
+
+  const handleBlockChange = (event) => {
+    applyCommand("formatBlock", event.target.value);
+  };
+
+  const handleFontSizeChange = (event) => {
+    applyCommand("fontSize", event.target.value);
+  };
+
+  const handleCreateLink = () => {
+    const rawUrl = window.prompt("Cole a URL do link:");
+    if (!rawUrl) return;
+
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    applyCommand("createLink", url);
+  };
+
+  const handleInsertImage = () => {
+    const rawUrl = window.prompt("Cole a URL da imagem:");
+    if (!rawUrl) return;
+
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    applyCommand("insertImage", url);
+  };
+
+  const handleColorChange = (command, value) => {
+    if (!value) return;
+    focusEditor();
+    applyCommand(command, value);
   };
 
   const handleStart = async () => {
@@ -411,7 +513,11 @@ export default function FocusEditor() {
 
     try {
       await navigator.clipboard?.writeText(plainText);
-      openFeedback("success", "Texto copiado", "O conteúdo do editor foi copiado para a área de transferência.");
+      openFeedback(
+        "success",
+        "Texto copiado",
+        "O conteúdo do editor foi copiado para a área de transferência."
+      );
     } catch (error) {
       console.error(error);
       openFeedback("error", "Nao foi possivel copiar", "Falha ao copiar o conteúdo do editor.");
@@ -560,44 +666,83 @@ export default function FocusEditor() {
       </section>
 
       <section className="panel space-y-4">
-        <div className="rounded-[28px] border border-black/10 bg-white/60 shadow-sm overflow-hidden">
-          <div className="border-b border-black/10 bg-[#f6f2ea] px-4 py-3">
-            <div className="flex flex-wrap gap-2">
-              {TOOLBAR_ITEMS.map((item) => {
-                const isActive =
-                  (item.activeKey && toolbarState[item.activeKey]) ||
-                  (item.activeBlock && toolbarState.block === item.activeBlock);
-
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-[#2f5d73] bg-[#2f5d73] text-white"
-                        : "border-black/10 bg-white text-[#1f2937] hover:bg-black/5"
-                    }`}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => applyCommand(item.command, item.value)}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+        <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-sm">
+          <div className="border-b border-black/10 bg-[#f2f2f2] px-3 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <ToolbarSelect
+                value={toolbarState.block}
+                onChange={handleBlockChange}
+                options={BLOCK_OPTIONS}
+              />
+              <ToolbarSelect
+                value={toolbarState.fontSize}
+                onChange={handleFontSizeChange}
+                options={FONT_SIZE_OPTIONS}
+                width="min-w-[132px]"
+              />
+              <ToolbarSeparator />
+              <ToolbarButton icon={Heading1} label="Heading 1" onClick={() => applyCommand("formatBlock", "h1")} active={toolbarState.block === "h1"} />
+              <ToolbarButton icon={Heading2} label="Heading 2" onClick={() => applyCommand("formatBlock", "h2")} active={toolbarState.block === "h2"} />
+              <ToolbarButton icon={Pilcrow} label="Parágrafo" onClick={() => applyCommand("formatBlock", "p")} active={toolbarState.block === "p"} />
+              <ToolbarButton icon={Code2} label="Code block" onClick={() => applyCommand("formatBlock", "pre")} active={toolbarState.block === "pre"} />
+              <ToolbarButton icon={Quote} label="Citação" onClick={() => applyCommand("formatBlock", "blockquote")} active={toolbarState.block === "blockquote"} />
+              <ToolbarSeparator />
+              <ToolbarButton icon={Link2} label="Inserir link" onClick={handleCreateLink} />
+              <ToolbarButton icon={Unlink2} label="Remover link" onClick={() => applyCommand("unlink")} />
+              <ToolbarButton icon={ImagePlus} label="Inserir imagem" onClick={handleInsertImage} />
+              <ToolbarButton icon={Minus} label="Linha horizontal" onClick={() => applyCommand("insertHorizontalRule")} />
             </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <ToolbarButton icon={Bold} label="Negrito" onClick={() => applyCommand("bold")} active={toolbarState.bold} />
+              <ToolbarButton icon={Italic} label="Itálico" onClick={() => applyCommand("italic")} active={toolbarState.italic} />
+              <ToolbarButton icon={Underline} label="Sublinhado" onClick={() => applyCommand("underline")} active={toolbarState.underline} />
+              <ToolbarButton icon={Strikethrough} label="Riscado" onClick={() => applyCommand("strikeThrough")} active={toolbarState.strikeThrough} />
+              <ToolbarButton icon={Superscript} label="Sobrescrito" onClick={() => applyCommand("superscript")} active={toolbarState.superscript} />
+              <ToolbarButton icon={Subscript} label="Subscrito" onClick={() => applyCommand("subscript")} active={toolbarState.subscript} />
+              <ToolbarSeparator />
+              <ToolbarButton icon={Palette} label="Cor do texto" onClick={() => textColorInputRef.current?.click()} />
+              <ToolbarButton icon={Highlighter} label="Destaque" onClick={() => highlightColorInputRef.current?.click()} />
+              <ToolbarSeparator />
+              <ToolbarButton icon={AlignLeft} label="Alinhar à esquerda" onClick={() => applyCommand("justifyLeft")} active={toolbarState.justifyLeft} />
+              <ToolbarButton icon={AlignCenter} label="Centralizar" onClick={() => applyCommand("justifyCenter")} active={toolbarState.justifyCenter} />
+              <ToolbarButton icon={AlignRight} label="Alinhar à direita" onClick={() => applyCommand("justifyRight")} active={toolbarState.justifyRight} />
+              <ToolbarButton icon={AlignJustify} label="Justificar" onClick={() => applyCommand("justifyFull")} active={toolbarState.justifyFull} />
+              <ToolbarSeparator />
+              <ToolbarButton icon={List} label="Lista com marcadores" onClick={() => applyCommand("insertUnorderedList")} active={toolbarState.unorderedList} />
+              <ToolbarButton icon={ListOrdered} label="Lista numerada" onClick={() => applyCommand("insertOrderedList")} active={toolbarState.orderedList} />
+              <ToolbarButton icon={IndentDecrease} label="Diminuir recuo" onClick={() => applyCommand("outdent")} />
+              <ToolbarButton icon={IndentIncrease} label="Aumentar recuo" onClick={() => applyCommand("indent")} />
+              <ToolbarSeparator />
+              <ToolbarButton icon={Undo2} label="Desfazer" onClick={() => applyCommand("undo")} />
+              <ToolbarButton icon={Redo2} label="Refazer" onClick={() => applyCommand("redo")} />
+              <ToolbarButton icon={Eraser} label="Limpar formatação" onClick={() => { applyCommand("removeFormat"); applyCommand("unlink"); }} />
+            </div>
+            <input
+              ref={textColorInputRef}
+              type="color"
+              className="hidden"
+              onChange={(event) => handleColorChange("foreColor", event.target.value)}
+            />
+            <input
+              ref={highlightColorInputRef}
+              type="color"
+              className="hidden"
+              onChange={(event) => handleColorChange("hiliteColor", event.target.value)}
+            />
           </div>
 
-          <div className="relative min-h-[420px] bg-white">
+          <div className="relative min-h-[500px] bg-white">
             {!plainText.trim() && (
-              <div className="pointer-events-none absolute left-4 top-4 text-sm text-muted">
-                Comece a escrever. Use a barra acima para aplicar estilos no texto.
+              <div className="pointer-events-none absolute left-4 top-4 text-2xl text-black/45">
+                Type or paste your content here!
               </div>
             )}
             <div
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              className="min-h-[420px] px-4 py-4 outline-none text-[1.02rem] leading-8 [&_blockquote]:border-l-4 [&_blockquote]:border-[#caa46b] [&_blockquote]:pl-4 [&_blockquote]:italic [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:leading-tight [&_h1]:mb-4 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:leading-tight [&_h2]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6"
+              className="min-h-[500px] px-4 py-4 text-[1.02rem] leading-8 outline-none [&_blockquote]:border-l-4 [&_blockquote]:border-[#caa46b] [&_blockquote]:pl-4 [&_blockquote]:italic [&_font[size='2']]:text-sm [&_font[size='4']]:text-xl [&_font[size='5']]:text-2xl [&_h1]:mb-4 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:mb-3 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:leading-tight [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-3 [&_pre]:mb-4 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-[#f7f3ec] [&_pre]:px-4 [&_pre]:py-3 [&_pre]:font-mono [&_ul]:list-disc [&_ul]:pl-6"
+              onFocus={refreshToolbarState}
               onInput={handleEditorInput}
             />
           </div>
