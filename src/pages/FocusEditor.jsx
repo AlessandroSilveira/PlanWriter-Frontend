@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addProgress, getProjects } from "../api/projects";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import {
-  exportTextAsDoc,
+  exportHtmlAsDoc,
   exportTextAsPdf,
   exportTextAsTxt,
 } from "../utils/exportText.js";
@@ -10,6 +10,43 @@ import { isOngoing } from "../utils/overviewAggregation";
 
 function countWords(text) {
   return (text.trim().match(/\b\w+\b/gu) || []).length;
+}
+
+function normalizeEditorHtml(value) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+
+  const compact = normalized.replace(/\s+/g, "");
+  if (
+    compact === "<br>" ||
+    compact === "<div><br></div>" ||
+    compact === "<p><br></p>" ||
+    compact === "<p></p>"
+  ) {
+    return "";
+  }
+
+  return normalized;
+}
+
+function htmlToPlainText(html) {
+  if (!html) return "";
+
+  if (typeof document === "undefined") {
+    return String(html)
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = html;
+
+  return String(container.innerText || container.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .trimEnd();
 }
 
 function pad2(value) {
@@ -25,6 +62,64 @@ function formatDuration(totalSeconds) {
 }
 
 const fmt = (value) => (Number(value) || 0).toLocaleString("pt-BR");
+
+const DEFAULT_TOOLBAR_STATE = {
+  bold: false,
+  italic: false,
+  underline: false,
+  unorderedList: false,
+  orderedList: false,
+  block: "p",
+};
+
+const TOOLBAR_ITEMS = [
+  { key: "undo", label: "Desfazer", command: "undo" },
+  { key: "redo", label: "Refazer", command: "redo" },
+  { key: "bold", label: "B", command: "bold", activeKey: "bold" },
+  { key: "italic", label: "I", command: "italic", activeKey: "italic" },
+  { key: "underline", label: "U", command: "underline", activeKey: "underline" },
+  {
+    key: "paragraph",
+    label: "P",
+    command: "formatBlock",
+    value: "p",
+    activeBlock: "p",
+  },
+  {
+    key: "heading1",
+    label: "H1",
+    command: "formatBlock",
+    value: "h1",
+    activeBlock: "h1",
+  },
+  {
+    key: "heading2",
+    label: "H2",
+    command: "formatBlock",
+    value: "h2",
+    activeBlock: "h2",
+  },
+  {
+    key: "quote",
+    label: "Citação",
+    command: "formatBlock",
+    value: "blockquote",
+    activeBlock: "blockquote",
+  },
+  {
+    key: "unorderedList",
+    label: "Lista",
+    command: "insertUnorderedList",
+    activeKey: "unorderedList",
+  },
+  {
+    key: "orderedList",
+    label: "1.",
+    command: "insertOrderedList",
+    activeKey: "orderedList",
+  },
+  { key: "clear", label: "Limpar estilo", command: "removeFormat" },
+];
 
 async function ensureAudioContext(audioContextRef) {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -64,16 +159,38 @@ async function playCue(audioContextRef) {
   oscillator.stop(context.currentTime + 0.24);
 }
 
+function getCurrentBlock(editorRoot) {
+  if (typeof window === "undefined" || !editorRoot) return "p";
+
+  const selection = window.getSelection?.();
+  if (!selection?.anchorNode || !editorRoot.contains(selection.anchorNode)) {
+    return "p";
+  }
+
+  let node =
+    selection.anchorNode.nodeType === Node.TEXT_NODE
+      ? selection.anchorNode.parentElement
+      : selection.anchorNode;
+
+  if (!(node instanceof Element)) return "p";
+
+  const block = node.closest("h1, h2, blockquote, ul, ol, p, div");
+  if (!block) return "p";
+  if (block.tagName.toLowerCase() === "div") return "p";
+  return block.tagName.toLowerCase();
+}
+
 export default function FocusEditor() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [text, setText] = useState("");
+  const [contentHtml, setContentHtml] = useState("");
   const [running, setRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [cueIntervalMinutes, setCueIntervalMinutes] = useState(10);
   const [lastSavedWords, setLastSavedWords] = useState(0);
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
   const [feedback, setFeedback] = useState({
     open: false,
     type: "info",
@@ -83,9 +200,11 @@ export default function FocusEditor() {
   });
 
   const audioContextRef = useRef(null);
+  const editorRef = useRef(null);
   const lastCueSecondRef = useRef(null);
 
-  const wordCount = useMemo(() => countWords(text), [text]);
+  const plainText = useMemo(() => htmlToPlainText(contentHtml), [contentHtml]);
+  const wordCount = useMemo(() => countWords(plainText), [plainText]);
   const unsavedWords = Math.max(0, wordCount - lastSavedWords);
   const selectedProject = useMemo(
     () =>
@@ -114,6 +233,27 @@ export default function FocusEditor() {
     });
   };
 
+  const refreshToolbarState = useCallback(() => {
+    if (typeof document === "undefined") return;
+
+    const editor = editorRef.current;
+    const selection = window.getSelection?.();
+
+    if (!editor || !selection?.anchorNode || !editor.contains(selection.anchorNode)) {
+      setToolbarState(DEFAULT_TOOLBAR_STATE);
+      return;
+    }
+
+    setToolbarState({
+      bold: document.queryCommandState?.("bold") ?? false,
+      italic: document.queryCommandState?.("italic") ?? false,
+      underline: document.queryCommandState?.("underline") ?? false,
+      unorderedList: document.queryCommandState?.("insertUnorderedList") ?? false,
+      orderedList: document.queryCommandState?.("insertOrderedList") ?? false,
+      block: getCurrentBlock(editor),
+    });
+  }, []);
+
   useEffect(() => {
     async function loadProjects() {
       try {
@@ -125,7 +265,9 @@ export default function FocusEditor() {
           const exists = activeProjects.some(
             (project) => String(project.id ?? project.projectId) === String(current)
           );
-          return exists ? current : String(activeProjects[0]?.id ?? activeProjects[0]?.projectId ?? "");
+          return exists
+            ? current
+            : String(activeProjects[0]?.id ?? activeProjects[0]?.projectId ?? "");
         });
       } catch (error) {
         console.error("Erro ao carregar projetos:", error);
@@ -155,12 +297,56 @@ export default function FocusEditor() {
   }, [cueEverySeconds, elapsedSeconds, running]);
 
   useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const domHtml = normalizeEditorHtml(editor.innerHTML);
+    if (domHtml !== contentHtml) {
+      editor.innerHTML = contentHtml;
+    }
+  }, [contentHtml]);
+
+  useEffect(() => {
+    const handleSelectionChange = () => refreshToolbarState();
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, [refreshToolbarState]);
+
+  useEffect(() => {
     return () => {
       if (audioContextRef.current && typeof audioContextRef.current.close === "function") {
         audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
+
+  const handleEditorInput = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    setContentHtml(normalizeEditorHtml(editor.innerHTML));
+    refreshToolbarState();
+  };
+
+  const applyCommand = (command, value = undefined) => {
+    const editor = editorRef.current;
+    if (!editor || typeof document === "undefined") return;
+
+    editor.focus();
+
+    if (!normalizeEditorHtml(editor.innerHTML) && command !== "undo" && command !== "redo") {
+      editor.innerHTML = "<p><br></p>";
+    }
+
+    if (command === "formatBlock" && value) {
+      document.execCommand(command, false, value);
+    } else {
+      document.execCommand(command, false, value);
+    }
+
+    setContentHtml(normalizeEditorHtml(editor.innerHTML));
+    refreshToolbarState();
+  };
 
   const handleStart = async () => {
     setRunning(true);
@@ -183,20 +369,24 @@ export default function FocusEditor() {
   };
 
   const handleNewDraft = () => {
-    setText("");
+    setContentHtml("");
     setLastSavedWords(0);
     setLastSavedElapsedSeconds(0);
     setElapsedSeconds(0);
     setRunning(false);
     lastCueSecondRef.current = null;
+    if (editorRef.current) {
+      editorRef.current.innerHTML = "";
+      editorRef.current.focus();
+    }
   };
 
   const handleExport = (format) => {
-    if (!text.trim()) {
+    if (!plainText.trim()) {
       openFeedback(
         "warning",
         "Nada para exportar",
-        "Digite ou cole um texto antes de exportar o conteúdo."
+        "Escreva algum conteúdo antes de exportar o texto."
       );
       return;
     }
@@ -204,16 +394,28 @@ export default function FocusEditor() {
     const title = selectedProject?.title ?? selectedProject?.name ?? "Editor de texto";
 
     if (format === "txt") {
-      exportTextAsTxt(text);
+      exportTextAsTxt(plainText);
       return;
     }
 
     if (format === "doc") {
-      exportTextAsDoc(text, undefined, title);
+      exportHtmlAsDoc(contentHtml, undefined, title);
       return;
     }
 
-    exportTextAsPdf(text, undefined, title);
+    exportTextAsPdf(plainText, undefined, title);
+  };
+
+  const handleCopyText = async () => {
+    if (!plainText.trim()) return;
+
+    try {
+      await navigator.clipboard?.writeText(plainText);
+      openFeedback("success", "Texto copiado", "O conteúdo do editor foi copiado para a área de transferência.");
+    } catch (error) {
+      console.error(error);
+      openFeedback("error", "Nao foi possivel copiar", "Falha ao copiar o conteúdo do editor.");
+    }
   };
 
   const handleSaveToProject = async () => {
@@ -358,12 +560,48 @@ export default function FocusEditor() {
       </section>
 
       <section className="panel space-y-4">
-        <textarea
-          className="input min-h-[420px]"
-          placeholder="Escreva ou cole seu texto aqui..."
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
+        <div className="rounded-[28px] border border-black/10 bg-white/60 shadow-sm overflow-hidden">
+          <div className="border-b border-black/10 bg-[#f6f2ea] px-4 py-3">
+            <div className="flex flex-wrap gap-2">
+              {TOOLBAR_ITEMS.map((item) => {
+                const isActive =
+                  (item.activeKey && toolbarState[item.activeKey]) ||
+                  (item.activeBlock && toolbarState.block === item.activeBlock);
+
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                      isActive
+                        ? "border-[#2f5d73] bg-[#2f5d73] text-white"
+                        : "border-black/10 bg-white text-[#1f2937] hover:bg-black/5"
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyCommand(item.command, item.value)}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="relative min-h-[420px] bg-white">
+            {!plainText.trim() && (
+              <div className="pointer-events-none absolute left-4 top-4 text-sm text-muted">
+                Comece a escrever. Use a barra acima para aplicar estilos no texto.
+              </div>
+            )}
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              className="min-h-[420px] px-4 py-4 outline-none text-[1.02rem] leading-8 [&_blockquote]:border-l-4 [&_blockquote]:border-[#caa46b] [&_blockquote]:pl-4 [&_blockquote]:italic [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:leading-tight [&_h1]:mb-4 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:leading-tight [&_h2]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6"
+              onInput={handleEditorInput}
+            />
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <button type="button" className="button" onClick={handleNewDraft}>
@@ -372,8 +610,8 @@ export default function FocusEditor() {
           <button
             type="button"
             className="button"
-            onClick={() => navigator.clipboard?.writeText(text)}
-            disabled={!text.trim()}
+            onClick={() => void handleCopyText()}
+            disabled={!plainText.trim()}
           >
             Copiar texto
           </button>
@@ -381,7 +619,7 @@ export default function FocusEditor() {
             type="button"
             className="button"
             onClick={() => handleExport("txt")}
-            disabled={!text.trim()}
+            disabled={!plainText.trim()}
           >
             Exportar TXT
           </button>
@@ -389,7 +627,7 @@ export default function FocusEditor() {
             type="button"
             className="button"
             onClick={() => handleExport("doc")}
-            disabled={!text.trim()}
+            disabled={!plainText.trim()}
           >
             Exportar DOC
           </button>
@@ -397,7 +635,7 @@ export default function FocusEditor() {
             type="button"
             className="button"
             onClick={() => handleExport("pdf")}
-            disabled={!text.trim()}
+            disabled={!plainText.trim()}
           >
             Exportar PDF
           </button>
