@@ -1,15 +1,9 @@
 // src/api/auth.js
-import api from "./http";
+import api, { getRefreshToken, normalizeAuthTokens } from "./http";
 
 export async function login(payload) {
   const response = await api.post("/auth/login", payload);
-
-  return (
-    response.data.accessToken ??
-    response.data.AccessToken ??
-    response.data.token ??
-    null
-  );
+  return normalizeAuthTokens(response?.data);
 }
 
 // 👇 alias para compatibilidade
@@ -31,6 +25,31 @@ export async function register({ firstName, lastName, dateOfBirth, email, passwo
   return data;
 }
 
+export async function logoutSession(rawRefreshToken = null) {
+  const refreshToken = rawRefreshToken || getRefreshToken();
+  if (!refreshToken) return;
+
+  await api.post(
+    "/auth/logout",
+    { refreshToken },
+    {
+      skipAuthRedirectOn401: true,
+      skipAuthRefreshOn401: true,
+    }
+  );
+}
+
+export async function logoutAllSessions() {
+  await api.post(
+    "/auth/logout-all",
+    {},
+    {
+      skipAuthRedirectOn401: true,
+      skipAuthRefreshOn401: true,
+    }
+  );
+}
+
 export function logout() {
-  return Promise.resolve();
+  return logoutSession();
 }

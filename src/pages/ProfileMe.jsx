@@ -1,12 +1,25 @@
 // src/pages/ProfileMe.jsx
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getMyProfile, updateMyProfile } from "../api/profile";
 import { getProjects } from "../api/projects";
+import { useAuth } from "../context/AuthContext";
+import FeedbackModal from "../components/FeedbackModal.jsx";
 
 export default function ProfileMe() {
+  const navigate = useNavigate();
+  const { logoutAll } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
   const [err, setErr] = useState("");
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    primaryLabel: "OK",
+  });
 
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -111,6 +124,32 @@ export default function ProfileMe() {
     return `${window.location.origin}/u/${slug}`;
   }, [isPublic, slug]);
 
+  const handleLogoutAllSessions = async () => {
+    setIsLoggingOutAll(true);
+    setErr("");
+
+    try {
+      await logoutAll();
+      setFeedback({
+        open: true,
+        type: "success",
+        title: "Sessões encerradas",
+        message: "Por segurança, você saiu em todos os dispositivos. Faça login novamente para continuar.",
+        primaryLabel: "OK",
+      });
+    } catch {
+      setFeedback({
+        open: true,
+        type: "error",
+        title: "Não foi possível encerrar as sessões",
+        message: "Tente novamente em instantes.",
+        primaryLabel: "OK",
+      });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  };
+
   if (loading) {
     return <div className="container py-6">Carregando…</div>;
   }
@@ -123,22 +162,32 @@ export default function ProfileMe() {
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">Meu Perfil</h1>
 
-          {isEditing ? (
+          <div className="flex items-center gap-2">
             <button
-              className="btn-primary"
-              onClick={save}
-              disabled={saving}
+              className="button"
+              onClick={handleLogoutAllSessions}
+              disabled={isLoggingOutAll}
             >
-              {saving ? "Salvando…" : "Salvar alterações"}
+              {isLoggingOutAll ? "Encerrando sessões..." : "Encerrar todas as sessões"}
             </button>
-          ) : (
-            <button
-              className="btn-primary"
-              onClick={() => setIsEditing(true)}
-            >
-              Editar perfil
-            </button>
-          )}
+
+            {isEditing ? (
+              <button
+                className="btn-primary"
+                onClick={save}
+                disabled={saving}
+              >
+                {saving ? "Salvando…" : "Salvar alterações"}
+              </button>
+            ) : (
+              <button
+                className="btn-primary"
+                onClick={() => setIsEditing(true)}
+              >
+                Editar perfil
+              </button>
+            )}
+          </div>
         </div>
 
         {err && <p className="text-red-600 mt-2">{err}</p>}
@@ -350,6 +399,19 @@ export default function ProfileMe() {
           </>
         )}
       </div>
+      <FeedbackModal
+        open={feedback.open}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        primaryLabel={feedback.primaryLabel}
+        onClose={() => {
+          setFeedback((prev) => ({ ...prev, open: false }));
+          if (feedback.type === "success") {
+            navigate("/", { replace: true });
+          }
+        }}
+      />
     </header>
   );
 }

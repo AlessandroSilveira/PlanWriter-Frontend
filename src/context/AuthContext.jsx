@@ -1,5 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import api, { clearAccessToken, getAccessToken, setAccessToken } from "../api/http";
+import api, {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  normalizeAuthTokens,
+  refreshAccessToken,
+  setAuthSession,
+} from "../api/http";
+import { logoutAllSessions, logoutSession } from "../api/auth";
 
 const AuthContext = createContext();
 
@@ -48,29 +56,88 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
+  function applyAuthenticatedSession(rawSession) {
+    const normalized = normalizeAuthTokens(rawSession);
+    if (!normalized.accessToken) {
+      throw new Error("Token inválido recebido do servidor.");
+    }
+
+    const decoded = decodeJwtPayload(normalized.accessToken);
+    if (!decoded || isExpired(decoded)) {
+      throw new Error("Token expirado.");
+    }
+
+    const mapped = mapUserFromClaims(decoded);
+    if (!mapped?.email) {
+      throw new Error("Claims de autenticação inválidas.");
+    }
+
+    setAuthSession(normalized);
+    setToken(normalized.accessToken);
+    setUser(mapped);
+    setIsBootstrapping(false);
+
+    return mapped;
+  }
+
+  function clearLocalSession() {
+    clearAuthSession();
+    setToken(null);
+    setUser(null);
+    setIsBootstrapping(false);
+  }
+
   useEffect(() => {
     let alive = true;
 
     const bootstrapSession = async () => {
       const storedToken = getAccessToken();
-      if (storedToken) {
-        try {
-          const decoded = decodeJwtPayload(storedToken);
-          if (!decoded || isExpired(decoded)) {
-            throw new Error("Stored token expired.");
-          }
+      const storedRefreshToken = getRefreshToken();
 
-          const mapped = mapUserFromClaims(decoded);
-          if (mapped?.email) {
-            setToken(storedToken);
-            setUser(mapped);
-            setIsBootstrapping(false);
-            return;
-          }
+      if (storedToken && !storedRefreshToken) {
+        try {
+          applyAuthenticatedSession({ accessToken: storedToken });
+          if (!alive) return;
+          return;
         } catch {
-          clearAccessToken();
-          setToken(null);
-          setUser(null);
+          if (!alive) return;
+          clearLocalSession();
+          return;
+        }
+      }
+
+      if (storedToken && storedRefreshToken) {
+        try {
+          applyAuthenticatedSession({
+            accessToken: storedToken,
+            refreshToken: storedRefreshToken,
+          });
+          if (!alive) return;
+          return;
+        } catch {
+          // tenta renovação silenciosa abaixo
+        }
+      }
+
+      if (!storedToken && storedRefreshToken) {
+        try {
+          const refreshed = await refreshAccessToken();
+          if (!alive) return;
+          applyAuthenticatedSession(refreshed);
+          return;
+        } catch {
+          // fallback para /profile/me
+        }
+      }
+
+      if (storedToken && storedRefreshToken) {
+        try {
+          const refreshed = await refreshAccessToken();
+          if (!alive) return;
+          applyAuthenticatedSession(refreshed);
+          return;
+        } catch {
+          // fallback para /profile/me
         }
       }
 
@@ -78,6 +145,7 @@ export function AuthProvider({ children }) {
         // Bootstrap via cookie-backed session when available.
         const { data } = await api.get("/profile/me", {
           skipAuthRedirectOn401: true,
+          skipAuthRefreshOn401: true,
         });
 
         if (!alive) return;
@@ -85,12 +153,15 @@ export function AuthProvider({ children }) {
         const sessionUser = mapUserFromClaims(data);
         if (sessionUser?.email) {
           setUser(sessionUser);
+          setToken(getAccessToken());
+          setIsBootstrapping(false);
+          return;
         }
+
+        throw new Error("No session claims.");
       } catch {
         if (!alive) return;
-        setUser(null);
-        setToken(null);
-        clearAccessToken();
+        clearLocalSession();
       } finally {
         if (alive) {
           setIsBootstrapping(false);
@@ -105,40 +176,44 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  function login(newToken) {
-    if (typeof newToken !== "string" || newToken.trim().length === 0) {
-      throw new Error("Token inválido recebido do servidor.");
+  function login(rawSession) {
+    if (typeof rawSession !== "string" && (!rawSession || typeof rawSession !== "object")) {
+      throw new Error("Sessão inválida recebida do servidor.");
     }
 
-    const normalizedToken = newToken.trim();
-
     try {
-      const decoded = decodeJwtPayload(normalizedToken);
-      if (!decoded || isExpired(decoded)) {
-        throw new Error("Token expirado.");
-      }
-
-      const mapped = mapUserFromClaims(decoded);
-
-      setAccessToken(normalizedToken);
-      setToken(normalizedToken);
-      setUser(mapped);
-      setIsBootstrapping(false);
-
-      return mapped;
+      return applyAuthenticatedSession(
+        typeof rawSession === "string"
+          ? { accessToken: rawSession }
+          : rawSession
+      );
     } catch (error) {
-      setUser(null);
-      setToken(null);
-      clearAccessToken();
+      clearLocalSession();
       throw error;
     }
   }
 
-  function logout() {
-    clearAccessToken();
-    setToken(null);
-    setUser(null);
-    setIsBootstrapping(false);
+  async function logout() {
+    const refreshToken = getRefreshToken();
+    try {
+      if (refreshToken) {
+        await logoutSession(refreshToken);
+      }
+    } catch {
+      // logout local deve continuar mesmo com falha remota
+    } finally {
+      clearLocalSession();
+    }
+  }
+
+  async function logoutAll() {
+    try {
+      await logoutAllSessions();
+    } catch {
+      // logout local deve continuar mesmo com falha remota
+    } finally {
+      clearLocalSession();
+    }
   }
 
   const value = useMemo(
@@ -148,6 +223,7 @@ export function AuthProvider({ children }) {
       login,
       setToken: login,
       logout,
+      logoutAll,
       isAuthenticated: !!user,
       isBootstrapping,
     }),
