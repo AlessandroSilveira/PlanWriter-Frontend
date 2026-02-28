@@ -1,13 +1,26 @@
+function isAuthRequest(error) {
+  const url = String(error?.config?.url ?? "").toLowerCase();
+  return url.includes("/auth/");
+}
+
+function isLockout(error) {
+  return isAuthRequest(error) && error?.response?.status === 403;
+}
+
 export function getAuthFriendlyMessage(error, fallbackMessage) {
   const fallback = fallbackMessage || "Não foi possível concluir o login. Tente novamente.";
   const status = error?.response?.status;
+
+  if (isLockout(error)) {
+    return "Sua conta foi temporariamente bloqueada por segurança. Aguarde um pouco e tente novamente.";
+  }
 
   if (status === 401) {
     return "Não foi possível entrar. Confira e-mail e senha e tente novamente.";
   }
 
   if (status === 403) {
-    return "Sua conta não tem permissão para acessar esta área.";
+    return "Você não tem permissão para acessar este recurso.";
   }
 
   if (status === 429) {
@@ -18,23 +31,17 @@ export function getAuthFriendlyMessage(error, fallbackMessage) {
     return "Estamos com instabilidade no servidor. Tente novamente em instantes.";
   }
 
-  const apiMessage = error?.response?.data?.message;
-  if (typeof apiMessage === "string" && apiMessage.trim()) {
-    return apiMessage;
-  }
-
-  const apiTitle = error?.response?.data?.title;
-  if (typeof apiTitle === "string" && apiTitle.trim()) {
-    return apiTitle;
-  }
-
   const rawMessage = error?.message;
+  if (
+    typeof rawMessage === "string" &&
+    (rawMessage.toLowerCase().includes("network error") ||
+      rawMessage.toLowerCase().includes("failed to fetch"))
+  ) {
+    return "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
+  }
+
   if (typeof rawMessage === "string" && /^Request failed with status code \d+$/i.test(rawMessage)) {
     return fallback;
-  }
-
-  if (typeof rawMessage === "string" && rawMessage.trim()) {
-    return rawMessage;
   }
 
   return fallback;
