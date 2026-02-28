@@ -94,6 +94,9 @@ export default function Navbar() {
                   <NavLink to="/sprint" className={navLink}>
                     Sprint
                   </NavLink>
+                  <NavLink to="/editor" className={navLink}>
+                    Editor
+                  </NavLink>
                   <NavLink to="/diary" className={navLink}>
                     Diário
                   </NavLink>
