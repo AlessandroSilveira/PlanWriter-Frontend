@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import LoginModal from "../components/LoginModal";
+import { consumeAuthNotice } from "../api/http";
 
 export default function Landing() {
   const [open, setOpen] = useState(false);
@@ -8,21 +9,34 @@ export default function Landing() {
   const navigate = useNavigate();
 
   const authIntent = searchParams.get("auth");
+  const sessionReason = searchParams.get("session");
+  const [showSessionExpiredNotice, setShowSessionExpiredNotice] = useState(false);
   const modalInitialMode = useMemo(
     () => (authIntent === "register" ? "register" : "login"),
     [authIntent]
   );
 
   useEffect(() => {
-    if (authIntent === "register" || authIntent === "login") {
+    if (
+      authIntent === "register" ||
+      authIntent === "login" ||
+      sessionReason === "expired"
+    ) {
       setOpen(true);
     }
-  }, [authIntent]);
+  }, [authIntent, sessionReason]);
+
+  useEffect(() => {
+    const notice = consumeAuthNotice();
+    if (sessionReason === "expired" || notice === "expired") {
+      setShowSessionExpiredNotice(true);
+    }
+  }, [sessionReason]);
 
   const handleCloseModal = () => {
     setOpen(false);
 
-    if (authIntent) {
+    if (authIntent || sessionReason) {
       navigate("/", { replace: true });
     }
   };
@@ -96,6 +110,7 @@ export default function Landing() {
         open={open}
         onClose={handleCloseModal}
         initialMode={modalInitialMode}
+        showSessionExpiredNotice={showSessionExpiredNotice}
       />
     </>
   );
