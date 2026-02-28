@@ -1,7 +1,7 @@
 // src/utils/overviewAggregation.js
 
 // Helper: date -> 'YYYY-MM-DD' local
-function toYMDLocal(date) {
+export function toYMDLocal(date) {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return null;
   const y = d.getFullYear();
