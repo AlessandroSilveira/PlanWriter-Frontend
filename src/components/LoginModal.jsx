@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginApi, register } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
@@ -6,7 +6,12 @@ import FeedbackModal from "./FeedbackModal.jsx";
 import { getAuthFriendlyMessage, getRegisterFriendlyMessage } from "../utils/authErrorMessage";
 import { resolvePostAuthPathFromUser } from "../utils/authRedirect";
 
-export default function LoginModal({ open, onClose, initialMode = "login" }) {
+export default function LoginModal({
+  open,
+  onClose,
+  initialMode = "login",
+  showSessionExpiredNotice = false,
+}) {
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -28,6 +33,7 @@ export default function LoginModal({ open, onClose, initialMode = "login" }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const hasShownSessionNoticeRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +41,21 @@ export default function LoginModal({ open, onClose, initialMode = "login" }) {
     setMode(initialMode === "register" ? "register" : "login");
     setFeedback((prev) => ({ ...prev, open: false }));
   }, [open, initialMode]);
+
+  useEffect(() => {
+    if (!open || !showSessionExpiredNotice || hasShownSessionNoticeRef.current) {
+      return;
+    }
+
+    hasShownSessionNoticeRef.current = true;
+    setFeedback({
+      open: true,
+      type: "warning",
+      title: "Sua sessão expirou",
+      message: "Faça login novamente para continuar de onde parou.",
+      primaryLabel: "OK",
+    });
+  }, [open, showSessionExpiredNotice]);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose?.();
@@ -48,9 +69,12 @@ export default function LoginModal({ open, onClose, initialMode = "login" }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = await loginApi({ email, password });
-      if (!token) throw new Error("Token não retornado pelo servidor.");
-      const authenticatedUser = login(token);
+      const authSession = await loginApi({ email, password });
+      if (!authSession?.accessToken) {
+        throw new Error("Sessão inválida recebida do servidor.");
+      }
+
+      const authenticatedUser = login(authSession);
       onClose?.();
       navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
     } catch (ex) {

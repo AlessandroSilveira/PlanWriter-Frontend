@@ -26,9 +26,12 @@ export default function Login() {
     setLoading(true);
     setFeedback((prev) => ({ ...prev, open: false }));
     try {
-      const token = await loginApi({ email, password });
-      if (!token) throw new Error("Token não retornado pelo backend");
-      const authenticatedUser = login(token);
+      const authSession = await loginApi({ email, password });
+      if (!authSession?.accessToken) {
+        throw new Error("Sessão inválida recebida do backend.");
+      }
+
+      const authenticatedUser = login(authSession);
       navigate(resolvePostAuthPathFromUser(authenticatedUser, "/dashboard"), { replace: true });
     } catch (ex) {
       setFeedback({
