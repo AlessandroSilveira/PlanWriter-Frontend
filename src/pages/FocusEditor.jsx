@@ -411,11 +411,11 @@ export default function FocusEditor() {
 
       const normalizedHtml = normalizeEditorHtml(html);
       const scopeKey = getDraftScopeKey(projectId);
+      const currentStoredDraft = readStoredDraft(projectId);
 
       if (!normalizedHtml) {
-        removeStoredDraft(projectId);
-        if (currentScopeRef.current === scopeKey) {
-          setLastAutosavedAt(null);
+        if (currentScopeRef.current === scopeKey && currentStoredDraft?.updatedAt) {
+          setLastAutosavedAt(currentStoredDraft.updatedAt);
         }
         return;
       }
