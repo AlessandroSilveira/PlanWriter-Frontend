@@ -39,8 +39,11 @@ import {
 import { isOngoing } from "../utils/overviewAggregation";
 
 const EDITOR_DRAFTS_STORAGE_KEY = "pw_focus_editor_drafts_v1";
+const EDITOR_DRAFT_HISTORY_STORAGE_KEY = "pw_focus_editor_draft_history_v1";
 const AUTOSAVE_DELAY_MS = 5000;
 const DEFAULT_DRAFT_SCOPE = "__sem_projeto__";
+const MAX_DRAFT_HISTORY_ENTRIES = 5;
+const DRAFT_HISTORY_MIN_INTERVAL_MS = 30000;
 
 function countWords(text) {
   return (text.trim().match(/\b\w+\b/gu) || []).length;
@@ -110,9 +113,36 @@ function writeStoredDrafts(nextDrafts) {
   window.localStorage.setItem(EDITOR_DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
 }
 
+function readStoredDraftHistory() {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(EDITOR_DRAFT_HISTORY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredDraftHistory(nextHistory) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    EDITOR_DRAFT_HISTORY_STORAGE_KEY,
+    JSON.stringify(nextHistory)
+  );
+}
+
 function readStoredDraft(projectId) {
   const drafts = readStoredDrafts();
   return drafts[getDraftScopeKey(projectId)] ?? null;
+}
+
+function readStoredDraftVersions(projectId) {
+  const history = readStoredDraftHistory();
+  const stored = history[getDraftScopeKey(projectId)];
+  return Array.isArray(stored) ? stored : [];
 }
 
 function removeStoredDraft(projectId) {
@@ -120,6 +150,12 @@ function removeStoredDraft(projectId) {
   const scopeKey = getDraftScopeKey(projectId);
   if (!(scopeKey in drafts)) return;
   delete drafts[scopeKey];
+  writeStoredDrafts(drafts);
+}
+
+function setStoredDraft(projectId, payload) {
+  const drafts = readStoredDrafts();
+  drafts[getDraftScopeKey(projectId)] = payload;
   writeStoredDrafts(drafts);
 }
 
@@ -141,6 +177,51 @@ function formatDuration(totalSeconds) {
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = seconds % 60;
   return `${pad2(hours)}:${pad2(minutes)}:${pad2(remainingSeconds)}`;
+}
+
+function createDraftPayload(projectId, projectLabel, html, updatedAt = new Date().toISOString()) {
+  const normalizedHtml = normalizeEditorHtml(html);
+  const plain = htmlToPlainText(normalizedHtml);
+
+  return {
+    projectId: projectId || null,
+    projectLabel: projectLabel || "Sem projeto",
+    contentHtml: normalizedHtml,
+    updatedAt,
+    wordCount: countWords(plain),
+    previewText: plain.slice(0, 180),
+  };
+}
+
+function appendStoredDraftVersion(projectId, snapshot, options = {}) {
+  if (!snapshot?.contentHtml) return readStoredDraftVersions(projectId);
+
+  const scopeKey = getDraftScopeKey(projectId);
+  const history = readStoredDraftHistory();
+  const current = Array.isArray(history[scopeKey]) ? history[scopeKey] : [];
+  const latest = current[0];
+
+  const force = options.force === true;
+  const snapshotTime = Date.parse(snapshot.updatedAt ?? "");
+  const latestTime = Date.parse(latest?.updatedAt ?? "");
+
+  if (!force && latest?.contentHtml === snapshot.contentHtml) {
+    return current;
+  }
+
+  if (
+    !force &&
+    Number.isFinite(snapshotTime) &&
+    Number.isFinite(latestTime) &&
+    snapshotTime - latestTime < DRAFT_HISTORY_MIN_INTERVAL_MS
+  ) {
+    return current;
+  }
+
+  const nextHistory = [snapshot, ...current].slice(0, MAX_DRAFT_HISTORY_ENTRIES);
+  history[scopeKey] = nextHistory;
+  writeStoredDraftHistory(history);
+  return nextHistory;
 }
 
 function normalizeFontSize(value) {
@@ -342,6 +423,48 @@ function DraftRecoveryModal({ draft, onRestore, onDiscard, onClose }) {
   );
 }
 
+function DraftHistoryPanel({ versions, onRestore }) {
+  if (!versions.length) return null;
+
+  return (
+    <details className="rounded-2xl border border-black/10 bg-white">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-[#111827] marker:hidden">
+        Histórico do rascunho ({versions.length} versões)
+      </summary>
+      <div className="border-t border-black/10">
+        {versions.map((version, index) => (
+          <div
+            key={`${version.updatedAt ?? "draft-version"}-${index}`}
+            className="flex flex-col gap-3 border-b border-black/5 px-4 py-3 last:border-b-0 md:flex-row md:items-start md:justify-between"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-[#111827]">
+                {formatDraftTimestamp(version.updatedAt)}
+              </div>
+              <div className="text-xs text-muted">{fmt(version.wordCount)} palavras</div>
+              {version.previewText ? (
+                <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                  {version.previewText}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="button shrink-0"
+              onClick={() => onRestore(version)}
+            >
+              Restaurar versão
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-black/10 px-4 py-3 text-xs text-muted">
+        Retenção: últimas {MAX_DRAFT_HISTORY_ENTRIES} versões salvas automaticamente.
+      </div>
+    </details>
+  );
+}
+
 export default function FocusEditor() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -356,6 +479,7 @@ export default function FocusEditor() {
   const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
   const [lastAutosavedAt, setLastAutosavedAt] = useState(null);
   const [draftPrompt, setDraftPrompt] = useState(null);
+  const [draftHistory, setDraftHistory] = useState([]);
   const [feedback, setFeedback] = useState({
     open: false,
     type: "info",
@@ -386,6 +510,8 @@ export default function FocusEditor() {
   const selectedProjectLabel =
     selectedProject?.title ?? selectedProject?.name ?? "este projeto";
   const currentDraftScope = getDraftScopeKey(selectedProjectId);
+  const selectedProjectName =
+    selectedProject?.title ?? selectedProject?.name ?? "Sem projeto";
 
   const cueEverySeconds = cueIntervalMinutes > 0 ? cueIntervalMinutes * 60 : null;
   const nextCueInSeconds = cueEverySeconds
@@ -417,33 +543,35 @@ export default function FocusEditor() {
       if (!normalizedHtml) {
         if (currentScopeRef.current === scopeKey && currentStoredDraft?.updatedAt) {
           setLastAutosavedAt(currentStoredDraft.updatedAt);
+          setDraftHistory(readStoredDraftVersions(projectId));
         }
         return;
       }
 
-      const plain = htmlToPlainText(normalizedHtml);
-      const payload = {
-        projectId: projectId || null,
-        projectLabel:
-          projects.find(
-            (project) => String(project.id ?? project.projectId) === String(projectId)
-          )?.title ??
-          projects.find(
-            (project) => String(project.id ?? project.projectId) === String(projectId)
-          )?.name ??
-          "Sem projeto",
-        contentHtml: normalizedHtml,
-        updatedAt: new Date().toISOString(),
-        wordCount: countWords(plain),
-        previewText: plain.slice(0, 180),
-      };
+      const projectLabel =
+        projects.find(
+          (project) => String(project.id ?? project.projectId) === String(projectId)
+        )?.title ??
+        projects.find(
+          (project) => String(project.id ?? project.projectId) === String(projectId)
+        )?.name ??
+        "Sem projeto";
 
-      const drafts = readStoredDrafts();
-      drafts[scopeKey] = payload;
-      writeStoredDrafts(drafts);
+      const payload = createDraftPayload(projectId, projectLabel, normalizedHtml);
+      let nextHistory = readStoredDraftVersions(projectId);
+
+      if (
+        currentStoredDraft?.contentHtml &&
+        currentStoredDraft.contentHtml !== payload.contentHtml
+      ) {
+        nextHistory = appendStoredDraftVersion(projectId, currentStoredDraft);
+      }
+
+      setStoredDraft(projectId, payload);
 
       if (currentScopeRef.current === scopeKey) {
         setLastAutosavedAt(payload.updatedAt);
+        setDraftHistory(nextHistory);
       }
     },
     [projects]
@@ -457,8 +585,10 @@ export default function FocusEditor() {
       window.clearTimeout(autosaveTimeoutRef.current);
 
       const storedDraft = readStoredDraft(projectId);
+      const storedHistory = readStoredDraftVersions(projectId);
 
       setContentHtml("");
+      setDraftHistory(storedHistory);
       if (editorRef.current) {
         editorRef.current.innerHTML = "";
       }
@@ -688,6 +818,10 @@ export default function FocusEditor() {
   };
 
   const handleNewDraft = () => {
+    const currentStoredDraft = readStoredDraft(selectedProjectId);
+    if (currentStoredDraft?.contentHtml) {
+      setDraftHistory(appendStoredDraftVersion(selectedProjectId, currentStoredDraft, { force: true }));
+    }
     removeStoredDraft(selectedProjectId);
     setContentHtml("");
     setLastAutosavedAt(null);
@@ -722,11 +856,43 @@ export default function FocusEditor() {
     setContentHtml("");
     setLastAutosavedAt(null);
     setDraftPrompt(null);
+    setDraftHistory(readStoredDraftVersions(selectedProjectId));
     autosaveSuspendedRef.current = false;
     if (editorRef.current) {
       editorRef.current.innerHTML = "";
       editorRef.current.focus();
     }
+  };
+
+  const handleRestoreVersion = (version) => {
+    const currentStoredDraft = readStoredDraft(selectedProjectId);
+    if (
+      currentStoredDraft?.contentHtml &&
+      currentStoredDraft.contentHtml !== version.contentHtml
+    ) {
+      appendStoredDraftVersion(selectedProjectId, currentStoredDraft, { force: true });
+    }
+
+    const restoredPayload = createDraftPayload(
+      selectedProjectId,
+      selectedProjectName,
+      version.contentHtml
+    );
+
+    setStoredDraft(selectedProjectId, restoredPayload);
+    setDraftHistory(readStoredDraftVersions(selectedProjectId));
+    setContentHtml(normalizeEditorHtml(version.contentHtml));
+    setLastAutosavedAt(restoredPayload.updatedAt);
+    setDraftPrompt(null);
+    autosaveSuspendedRef.current = false;
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    openFeedback(
+      "success",
+      "Versão restaurada",
+      "Uma versão anterior do rascunho foi restaurada no editor."
+    );
   };
 
   const handleExport = (format) => {
@@ -932,6 +1098,8 @@ export default function FocusEditor() {
             </div>
           </div>
         </div>
+
+        <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
       </section>
 
       <section className="panel space-y-4">
