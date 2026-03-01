@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import LoginModal from "../components/LoginModal";
-import { consumeAuthNotice } from "../api/http";
+import { clearAuthNotice, consumeAuthNotice } from "../api/http";
 
 export default function Landing() {
   const [open, setOpen] = useState(false);
@@ -35,6 +35,8 @@ export default function Landing() {
 
   const handleCloseModal = () => {
     setOpen(false);
+    setShowSessionExpiredNotice(false);
+    clearAuthNotice();
 
     if (authIntent || sessionReason) {
       navigate("/", { replace: true });

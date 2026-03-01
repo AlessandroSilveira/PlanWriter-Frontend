@@ -142,6 +142,7 @@ export function setAuthSession(session) {
   setAccessToken(normalized.accessToken);
   setRefreshToken(normalized.refreshToken);
   setRefreshTokenExpiresAtUtc(normalized.refreshTokenExpiresAtUtc);
+  clearAuthNotice();
   return normalized;
 }
 
@@ -163,6 +164,10 @@ export function persistAuthNotice(reason) {
   } catch {
     // ignore storage errors
   }
+}
+
+export function clearAuthNotice() {
+  persistAuthNotice(null);
 }
 
 export function consumeAuthNotice() {
