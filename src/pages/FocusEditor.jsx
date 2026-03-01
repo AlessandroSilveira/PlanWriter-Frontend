@@ -179,7 +179,12 @@ function formatDuration(totalSeconds) {
   return `${pad2(hours)}:${pad2(minutes)}:${pad2(remainingSeconds)}`;
 }
 
-function createDraftPayload(projectId, projectLabel, html, updatedAt = new Date().toISOString()) {
+function createDraftPayload(
+  projectId,
+  projectLabel,
+  html,
+  updatedAt = new Date().toISOString()
+) {
   const normalizedHtml = normalizeEditorHtml(html);
   const plain = htmlToPlainText(normalizedHtml);
 
@@ -820,7 +825,9 @@ export default function FocusEditor() {
   const handleNewDraft = () => {
     const currentStoredDraft = readStoredDraft(selectedProjectId);
     if (currentStoredDraft?.contentHtml) {
-      setDraftHistory(appendStoredDraftVersion(selectedProjectId, currentStoredDraft, { force: true }));
+      setDraftHistory(
+        appendStoredDraftVersion(selectedProjectId, currentStoredDraft, { force: true })
+      );
     }
     removeStoredDraft(selectedProjectId);
     setContentHtml("");
