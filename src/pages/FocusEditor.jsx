@@ -349,6 +349,7 @@ export default function FocusEditor() {
   const [running, setRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [cueIntervalMinutes, setCueIntervalMinutes] = useState(10);
+  const [exportFormat, setExportFormat] = useState("txt");
   const [lastSavedWords, setLastSavedWords] = useState(0);
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -411,11 +412,11 @@ export default function FocusEditor() {
 
       const normalizedHtml = normalizeEditorHtml(html);
       const scopeKey = getDraftScopeKey(projectId);
+      const currentStoredDraft = readStoredDraft(projectId);
 
       if (!normalizedHtml) {
-        removeStoredDraft(projectId);
-        if (currentScopeRef.current === scopeKey) {
-          setLastAutosavedAt(null);
+        if (currentScopeRef.current === scopeKey && currentStoredDraft?.updatedAt) {
+          setLastAutosavedAt(currentStoredDraft.updatedAt);
         }
         return;
       }
@@ -838,11 +839,11 @@ export default function FocusEditor() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)_minmax(320px,auto)]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_220px_auto]">
           <label className="flex flex-col gap-1">
             <span className="label">Projeto</span>
             <select
-              className="input h-[60px]"
+              className="input h-12"
               value={selectedProjectId}
               onChange={handleProjectChange}
             >
@@ -863,7 +864,7 @@ export default function FocusEditor() {
             <input
               type="number"
               min={0}
-              className="input h-[60px]"
+              className="input h-12"
               value={cueIntervalMinutes}
               onChange={(event) =>
                 setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
@@ -874,11 +875,11 @@ export default function FocusEditor() {
 
           <div className="flex flex-col gap-1">
             <span className="label invisible">Ações</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap gap-2">
               {!running ? (
                 <button
                   type="button"
-                  className="btn-primary h-[60px] w-full justify-center"
+                  className="btn-primary h-12 min-w-[132px] justify-center px-5"
                   onClick={() => void handleStart()}
                 >
                   Iniciar
@@ -886,7 +887,7 @@ export default function FocusEditor() {
               ) : (
                 <button
                   type="button"
-                  className="button h-[60px] w-full justify-center"
+                  className="button h-12 min-w-[132px] justify-center px-5"
                   onClick={handlePause}
                 >
                   Pausar
@@ -894,7 +895,7 @@ export default function FocusEditor() {
               )}
               <button
                 type="button"
-                className="button h-[60px] w-full justify-center"
+                className="button h-12 min-w-[132px] justify-center px-5"
                 onClick={handleResetTimer}
               >
                 Zerar tempo
@@ -1028,29 +1029,24 @@ export default function FocusEditor() {
           >
             Copiar texto
           </button>
+          <select
+            className="input h-11 w-[150px]"
+            aria-label="Formato de exportação"
+            value={exportFormat}
+            onChange={(event) => setExportFormat(event.target.value)}
+            disabled={!plainText.trim()}
+          >
+            <option value="txt">TXT</option>
+            <option value="doc">DOCX</option>
+            <option value="pdf">PDF</option>
+          </select>
           <button
             type="button"
             className="button"
-            onClick={() => handleExport("txt")}
+            onClick={() => handleExport(exportFormat)}
             disabled={!plainText.trim()}
           >
-            Exportar TXT
-          </button>
-          <button
-            type="button"
-            className="button"
-            onClick={() => handleExport("doc")}
-            disabled={!plainText.trim()}
-          >
-            Exportar DOCX
-          </button>
-          <button
-            type="button"
-            className="button"
-            onClick={() => handleExport("pdf")}
-            disabled={!plainText.trim()}
-          >
-            Exportar PDF
+            Exportar
           </button>
           <button
             type="button"
