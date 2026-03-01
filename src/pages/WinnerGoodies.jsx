@@ -7,6 +7,7 @@ import {
   getEventParticipantStatus,
   getMyEvents,
 } from "../api/events";
+import { resolveParticipantJourney } from "../utils/participantJourney";
 
 const TECHNICAL_ERROR_REGEX =
   /system\.|exception|stack trace|nullable object|materialization|sql|guid|invalidoperationexception|request failed with status code/i;
@@ -533,6 +534,10 @@ export default function WinnerGoodies() {
     return Math.max(0, goodies.remainingWords ?? goodies.targetWords - goodies.totalWords);
   }, [goodies]);
 
+  const journey = useMemo(
+    () => (goodies ? resolveParticipantJourney(goodies) : null),
+    [goodies]
+  );
   const statusMeta = useMemo(() => getStatusMeta(goodies?.eligibility?.status), [goodies?.eligibility?.status]);
   const blockedReason = useMemo(() => getGoodieBlockedReason(goodies), [goodies]);
   const eventStatusLabel = useMemo(
@@ -636,6 +641,7 @@ export default function WinnerGoodies() {
   const shareText = goodies
     ? `Concluí minha meta no ${goodies.eventName} com o projeto \"${goodies.projectTitle}\" no PlanWriter! 🎉`
     : "";
+  const showValidateCta = journey?.primaryAction === "validate" && goodies?.eventId && goodies?.projectId;
 
   return (
     <div className="container py-6 space-y-4">
@@ -683,13 +689,16 @@ export default function WinnerGoodies() {
         {!loadingGoodies && goodies && (
           <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Status de elegibilidade</p>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusMeta.className}`}>
-                {statusMeta.label}
+              <div>
+                <p className="text-sm font-semibold">Jornada final do evento</p>
+                <p className="mt-1 text-sm text-gray-700">
+                  {journey?.message || goodies.eligibility.message}
+                </p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${journey?.badgeClass || statusMeta.className}`}>
+                {journey?.label || statusMeta.label}
               </span>
             </div>
-
-            <p className="mt-2 text-sm text-gray-700">{goodies.eligibility.message}</p>
 
             <p className="mt-1 text-sm text-gray-600">
               Progresso: {formatWords(goodies.totalWords)} / {formatWords(goodies.targetWords)} palavras
@@ -704,6 +713,27 @@ export default function WinnerGoodies() {
               <p className="mt-2 text-xs text-amber-700 font-medium">
                 Motivo do bloqueio: {goodies.validationBlockReason}
               </p>
+            )}
+
+            {showValidateCta && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() =>
+                    navigate(`/validate?eventId=${goodies.eventId}&projectId=${goodies.projectId}`)
+                  }
+                >
+                  {journey.primaryLabel}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => navigate(`/events/${goodies.eventId}`)}
+                >
+                  Ver detalhes do evento
+                </button>
+              </div>
             )}
           </div>
         )}
