@@ -122,8 +122,15 @@ export function resolveParticipantJourney(status) {
       message: "Não foi possível carregar seu status agora.",
       primaryAction: "details",
       primaryLabel: "Detalhes",
+      secondaryAction: null,
+      secondaryLabel: "",
     };
   }
+
+  const isClosedLike =
+    status.isEventClosed ||
+    status.eventStatus === "closed" ||
+    status.eventStatus === "disabled";
 
   if (status.isValidated && status.isWinner) {
     return {
@@ -132,26 +139,29 @@ export function resolveParticipantJourney(status) {
       badgeClass: "bg-emerald-100 text-emerald-700",
       message: "Validação concluída. Goodies de vencedor liberados.",
       primaryAction: "winner",
-      primaryLabel: "Baixar goodies",
+      primaryLabel: "Central do vencedor",
+      secondaryAction: "details",
+      secondaryLabel: "Ver detalhes",
     };
   }
 
   if (status.isValidated) {
     return {
       key: "validated",
-      label: "Validado",
-      badgeClass: "bg-green-100 text-green-700",
-      message: `Projeto validado em ${formatDate(status.validatedAtUtc) || "data recente"}.`,
-      primaryAction: "details",
-      primaryLabel: "Ver resultado",
+      label: "Validado sem liberação",
+      badgeClass: "bg-slate-100 text-slate-700",
+      message:
+        status.validationBlockReason ||
+        status.eligibilityMessage ||
+        `Projeto validado em ${formatDate(status.validatedAtUtc) || "data recente"}, mas os goodies não foram liberados.`,
+      primaryAction: "winner",
+      primaryLabel: "Entender bloqueio",
+      secondaryAction: "details",
+      secondaryLabel: "Ver detalhes",
     };
   }
 
   if (status.canValidate || status.eligibilityStatus === "pending_validation") {
-    const isClosedLike =
-      status.isEventClosed ||
-      status.eventStatus === "closed" ||
-      status.eventStatus === "disabled";
     return {
       key: isClosedLike ? "pending-validation" : "ready",
       label: isClosedLike ? "Pendente de validação" : "Apto para validar",
@@ -162,10 +172,12 @@ export function resolveParticipantJourney(status) {
         "Meta atingida. Faça a validação final para liberar os goodies.",
       primaryAction: "validate",
       primaryLabel: "Validar agora",
+      secondaryAction: isClosedLike ? "winner" : "details",
+      secondaryLabel: isClosedLike ? "Ver status final" : "Ver detalhes",
     };
   }
 
-  if (status.isEventClosed) {
+  if (isClosedLike) {
     const hasWindowBlock =
       String(status.validationBlockReason ?? "").toLowerCase().includes("janela");
     if (hasWindowBlock) {
@@ -174,8 +186,10 @@ export function resolveParticipantJourney(status) {
         label: "Janela encerrada",
         badgeClass: "bg-amber-100 text-amber-800",
         message: status.validationBlockReason,
-        primaryAction: "details",
-        primaryLabel: "Ver resultado",
+        primaryAction: "winner",
+        primaryLabel: "Entender bloqueio",
+        secondaryAction: "details",
+        secondaryLabel: "Ver detalhes",
       };
     }
 
@@ -187,8 +201,10 @@ export function resolveParticipantJourney(status) {
         status.validationBlockReason ||
         status.eligibilityMessage ||
         "Evento encerrado sem elegibilidade de vencedor.",
-      primaryAction: "details",
-      primaryLabel: "Ver resultado",
+      primaryAction: "winner",
+      primaryLabel: "Entender bloqueio",
+      secondaryAction: "details",
+      secondaryLabel: "Ver detalhes",
     };
   }
 
@@ -202,5 +218,7 @@ export function resolveParticipantJourney(status) {
         : status.eligibilityMessage || "Continue escrevendo para progredir no evento.",
     primaryAction: "project",
     primaryLabel: "Continuar no projeto",
+    secondaryAction: "details",
+    secondaryLabel: "Ver detalhes",
   };
 }

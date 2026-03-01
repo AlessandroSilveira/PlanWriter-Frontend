@@ -14,6 +14,7 @@ export default function EventProgressStatusCard({
   won = false,
   onAction,
   actionLabel = "Detalhes",
+  actionTone = "secondary",
   className = "",
 }) {
   const safePercent = Math.min(100, Math.max(0, Math.round(Number(percent ?? 0))));
@@ -62,7 +63,7 @@ export default function EventProgressStatusCard({
           <button
             type="button"
             onClick={onAction}
-            className="px-4 py-2 border rounded-lg"
+            className={actionTone === "primary" ? "btn-primary" : "px-4 py-2 border rounded-lg"}
           >
             {actionLabel}
           </button>

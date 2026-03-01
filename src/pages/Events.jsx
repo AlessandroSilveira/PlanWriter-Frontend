@@ -19,7 +19,6 @@ import {
   buildFallbackParticipantStatus,
   makeParticipantStatusKey,
   normalizeParticipantStatus,
-  resolveParticipantJourney,
 } from "../utils/participantJourney";
 
 function getApiErrorMessage(error) {
@@ -144,23 +143,6 @@ export default function Events() {
     }
     return fallback;
   }, [normalizedMyEvents, participantStatuses, activeEventsById]);
-
-  const winnerCentralTarget = useMemo(() => {
-    for (const entry of normalizedMyEvents) {
-      if (!entry.eventId || !entry.projectId) continue;
-      const key = makeParticipantStatusKey(entry.eventId, entry.projectId);
-      const status = statusByEntry[key];
-      if (!status) continue;
-      const journey = resolveParticipantJourney(status);
-      if (journey.primaryAction === "winner") {
-        return {
-          eventId: entry.eventId,
-          projectId: entry.projectId,
-        };
-      }
-    }
-    return null;
-  }, [normalizedMyEvents, statusByEntry]);
 
   useEffect(() => {
     let mounted = true;
@@ -326,20 +308,6 @@ export default function Events() {
               Participe de desafios de escrita e acompanhe seu desempenho.
             </p>
           </div>
-
-          {winnerCentralTarget && (
-            <button
-              type="button"
-              className="button"
-              onClick={() =>
-                navigate(
-                  `/winner?eventId=${winnerCentralTarget.eventId}&projectId=${winnerCentralTarget.projectId}`
-                )
-              }
-            >
-              Central do vencedor
-            </button>
-          )}
         </div>
 
         <section>
