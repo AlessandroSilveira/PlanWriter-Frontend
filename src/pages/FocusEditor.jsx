@@ -116,11 +116,11 @@ const DEFAULT_TOOLBAR_STATE = {
 };
 
 const BLOCK_OPTIONS = [
-  { value: "p", label: "Parágrafo" },
-  { value: "h1", label: "Título 1" },
-  { value: "h2", label: "Título 2" },
-  { value: "blockquote", label: "Citação" },
-  { value: "pre", label: "Código" },
+  { value: "p", label: "Paragraph" },
+  { value: "h1", label: "Heading 1" },
+  { value: "h2", label: "Heading 2" },
+  { value: "blockquote", label: "Blockquote" },
+  { value: "pre", label: "Code block" },
 ];
 
 const FONT_SIZE_OPTIONS = [
@@ -226,11 +226,11 @@ function ToolbarSeparator() {
   return <div className="mx-1 hidden h-7 w-px bg-black/10 md:block" />;
 }
 
-function ToolbarSelect({ value, onChange, options, width = "168px" }) {
+function ToolbarSelect({ value, onChange, options, width = "190px" }) {
   return (
     <select
       style={{ width }}
-      className="h-10 w-auto max-w-none shrink-0 rounded-lg border border-black/10 bg-white px-3 pr-9 text-sm font-sans font-medium text-[#374151] outline-none transition focus:border-[#2f5d73]"
+      className="h-10 shrink-0 rounded-lg border border-black/10 bg-white px-3 pr-9 text-sm font-sans font-medium text-[#374151] outline-none transition focus:border-[#2f5d73]"
       value={value}
       onMouseDown={(event) => event.preventDefault()}
       onChange={onChange}
@@ -586,11 +586,11 @@ export default function FocusEditor() {
           </p>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.15fr)]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)_minmax(320px,auto)]">
           <label className="flex flex-col gap-1">
             <span className="label">Projeto</span>
             <select
-              className="input h-14"
+              className="input h-[60px]"
               value={selectedProjectId}
               onChange={(event) => setSelectedProjectId(event.target.value)}
             >
@@ -606,22 +606,27 @@ export default function FocusEditor() {
             </select>
           </label>
 
-          <div className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1">
             <span className="label">Sinal sonoro (minutos)</span>
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_160px]">
-              <input
-                type="number"
-                min={0}
-                className="input h-14"
-                value={cueIntervalMinutes}
-                onChange={(event) =>
-                  setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
-                }
-              />
+            <input
+              type="number"
+              min={0}
+              className="input h-[60px]"
+              value={cueIntervalMinutes}
+              onChange={(event) =>
+                setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
+              }
+            />
+            <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
+          </label>
+
+          <div className="flex flex-col gap-1">
+            <span className="label invisible">Ações</span>
+            <div className="grid grid-cols-2 gap-2">
               {!running ? (
                 <button
                   type="button"
-                  className="btn-primary h-14 w-full justify-center"
+                  className="btn-primary h-[60px] w-full justify-center"
                   onClick={() => void handleStart()}
                 >
                   Iniciar
@@ -629,7 +634,7 @@ export default function FocusEditor() {
               ) : (
                 <button
                   type="button"
-                  className="button h-14 w-full justify-center"
+                  className="button h-[60px] w-full justify-center"
                   onClick={handlePause}
                 >
                   Pausar
@@ -637,13 +642,12 @@ export default function FocusEditor() {
               )}
               <button
                 type="button"
-                className="button h-14 w-full justify-center"
+                className="button h-[60px] w-full justify-center"
                 onClick={handleResetTimer}
               >
                 Zerar tempo
               </button>
             </div>
-            <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
           </div>
         </div>
 
@@ -690,7 +694,7 @@ export default function FocusEditor() {
                 value={toolbarState.fontSize}
                 onChange={handleFontSizeChange}
                 options={FONT_SIZE_OPTIONS}
-                width="124px"
+                width="132px"
               />
               <ToolbarSeparator />
               <ToolbarButton icon={Heading1} label="Heading 1" onClick={() => applyCommand("formatBlock", "h1")} active={toolbarState.block === "h1"} />
