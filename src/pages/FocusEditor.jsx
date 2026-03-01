@@ -1031,6 +1031,7 @@ export default function FocusEditor() {
           </button>
           <select
             className="input h-11 w-[150px]"
+            aria-label="Formato de exportação"
             value={exportFormat}
             onChange={(event) => setExportFormat(event.target.value)}
             disabled={!plainText.trim()}
