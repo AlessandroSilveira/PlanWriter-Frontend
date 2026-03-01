@@ -38,6 +38,10 @@ import {
 } from "../utils/exportText.js";
 import { isOngoing } from "../utils/overviewAggregation";
 
+const EDITOR_DRAFTS_STORAGE_KEY = "pw_focus_editor_drafts_v1";
+const AUTOSAVE_DELAY_MS = 5000;
+const DEFAULT_DRAFT_SCOPE = "__sem_projeto__";
+
 function countWords(text) {
   return (text.trim().match(/\b\w+\b/gu) || []).length;
 }
@@ -81,6 +85,54 @@ function htmlToPlainText(html) {
 
 function pad2(value) {
   return String(value).padStart(2, "0");
+}
+
+function getDraftScopeKey(projectId) {
+  const value = String(projectId ?? "").trim();
+  return value || DEFAULT_DRAFT_SCOPE;
+}
+
+function readStoredDrafts() {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(EDITOR_DRAFTS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredDrafts(nextDrafts) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(EDITOR_DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
+}
+
+function readStoredDraft(projectId) {
+  const drafts = readStoredDrafts();
+  return drafts[getDraftScopeKey(projectId)] ?? null;
+}
+
+function removeStoredDraft(projectId) {
+  const drafts = readStoredDrafts();
+  const scopeKey = getDraftScopeKey(projectId);
+  if (!(scopeKey in drafts)) return;
+  delete drafts[scopeKey];
+  writeStoredDrafts(drafts);
+}
+
+function formatDraftTimestamp(value) {
+  if (!value) return "";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(parsed);
 }
 
 function formatDuration(totalSeconds) {
@@ -244,6 +296,52 @@ function ToolbarSelect({ value, onChange, options, width = "190px" }) {
   );
 }
 
+function DraftRecoveryModal({ draft, onRestore, onDiscard, onClose }) {
+  if (!draft) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose?.();
+      }}
+    >
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold">Recuperar rascunho</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Encontramos um rascunho salvo automaticamente para{" "}
+            <span className="font-medium text-[#111827]">{draft.projectLabel}</span>.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-black/10 bg-[#f8f5ef] p-4 text-sm text-gray-700">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>
+              <strong>Último autosave:</strong> {formatDraftTimestamp(draft.updatedAt)}
+            </span>
+            <span>
+              <strong>Palavras:</strong> {fmt(draft.wordCount)}
+            </span>
+          </div>
+          {draft.previewText ? (
+            <p className="mt-3 line-clamp-3 text-gray-600">{draft.previewText}</p>
+          ) : null}
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" className="button" onClick={onDiscard}>
+            Descartar rascunho
+          </button>
+          <button type="button" className="btn-primary" onClick={onRestore}>
+            Recuperar rascunho
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FocusEditor() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -255,6 +353,8 @@ export default function FocusEditor() {
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
   const [saving, setSaving] = useState(false);
   const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
+  const [lastAutosavedAt, setLastAutosavedAt] = useState(null);
+  const [draftPrompt, setDraftPrompt] = useState(null);
   const [feedback, setFeedback] = useState({
     open: false,
     type: "info",
@@ -268,6 +368,9 @@ export default function FocusEditor() {
   const textColorInputRef = useRef(null);
   const highlightColorInputRef = useRef(null);
   const lastCueSecondRef = useRef(null);
+  const autosaveTimeoutRef = useRef(null);
+  const autosaveSuspendedRef = useRef(true);
+  const currentScopeRef = useRef(null);
 
   const plainText = useMemo(() => htmlToPlainText(contentHtml), [contentHtml]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
@@ -279,6 +382,9 @@ export default function FocusEditor() {
       ) ?? null,
     [projects, selectedProjectId]
   );
+  const selectedProjectLabel =
+    selectedProject?.title ?? selectedProject?.name ?? "este projeto";
+  const currentDraftScope = getDraftScopeKey(selectedProjectId);
 
   const cueEverySeconds = cueIntervalMinutes > 0 ? cueIntervalMinutes * 60 : null;
   const nextCueInSeconds = cueEverySeconds
@@ -298,6 +404,76 @@ export default function FocusEditor() {
       primaryLabel,
     });
   };
+
+  const persistDraft = useCallback(
+    (projectId, html) => {
+      if (typeof window === "undefined") return;
+
+      const normalizedHtml = normalizeEditorHtml(html);
+      const scopeKey = getDraftScopeKey(projectId);
+
+      if (!normalizedHtml) {
+        removeStoredDraft(projectId);
+        if (currentScopeRef.current === scopeKey) {
+          setLastAutosavedAt(null);
+        }
+        return;
+      }
+
+      const plain = htmlToPlainText(normalizedHtml);
+      const payload = {
+        projectId: projectId || null,
+        projectLabel:
+          projects.find(
+            (project) => String(project.id ?? project.projectId) === String(projectId)
+          )?.title ??
+          projects.find(
+            (project) => String(project.id ?? project.projectId) === String(projectId)
+          )?.name ??
+          "Sem projeto",
+        contentHtml: normalizedHtml,
+        updatedAt: new Date().toISOString(),
+        wordCount: countWords(plain),
+        previewText: plain.slice(0, 180),
+      };
+
+      const drafts = readStoredDrafts();
+      drafts[scopeKey] = payload;
+      writeStoredDrafts(drafts);
+
+      if (currentScopeRef.current === scopeKey) {
+        setLastAutosavedAt(payload.updatedAt);
+      }
+    },
+    [projects]
+  );
+
+  const initializeDraftForProject = useCallback(
+    (projectId) => {
+      const scopeKey = getDraftScopeKey(projectId);
+      currentScopeRef.current = scopeKey;
+      autosaveSuspendedRef.current = true;
+      window.clearTimeout(autosaveTimeoutRef.current);
+
+      const storedDraft = readStoredDraft(projectId);
+
+      setContentHtml("");
+      if (editorRef.current) {
+        editorRef.current.innerHTML = "";
+      }
+
+      if (storedDraft?.contentHtml) {
+        setDraftPrompt(storedDraft);
+        setLastAutosavedAt(storedDraft.updatedAt ?? null);
+        return;
+      }
+
+      setDraftPrompt(null);
+      setLastAutosavedAt(null);
+      autosaveSuspendedRef.current = false;
+    },
+    []
+  );
 
   const refreshToolbarState = useCallback(() => {
     if (typeof document === "undefined") return;
@@ -387,12 +563,40 @@ export default function FocusEditor() {
   }, [refreshToolbarState]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleBeforeUnload = () => {
+      if (autosaveSuspendedRef.current) return;
+      persistDraft(selectedProjectId, contentHtml);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [contentHtml, persistDraft, selectedProjectId]);
+
+  useEffect(() => {
     return () => {
+      window.clearTimeout(autosaveTimeoutRef.current);
       if (audioContextRef.current && typeof audioContextRef.current.close === "function") {
         audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
+
+  useEffect(() => {
+    initializeDraftForProject(selectedProjectId);
+  }, [initializeDraftForProject, selectedProjectId]);
+
+  useEffect(() => {
+    if (autosaveSuspendedRef.current) return undefined;
+
+    window.clearTimeout(autosaveTimeoutRef.current);
+    autosaveTimeoutRef.current = window.setTimeout(() => {
+      persistDraft(selectedProjectId, contentHtml);
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => window.clearTimeout(autosaveTimeoutRef.current);
+  }, [contentHtml, persistDraft, selectedProjectId]);
 
   const handleEditorInput = () => {
     const editor = editorRef.current;
@@ -471,13 +675,53 @@ export default function FocusEditor() {
     lastCueSecondRef.current = null;
   };
 
+  const handleProjectChange = (event) => {
+    const nextProjectId = event.target.value;
+    if (nextProjectId === selectedProjectId) return;
+
+    if (!autosaveSuspendedRef.current) {
+      persistDraft(selectedProjectId, contentHtml);
+    }
+
+    setSelectedProjectId(nextProjectId);
+  };
+
   const handleNewDraft = () => {
+    removeStoredDraft(selectedProjectId);
     setContentHtml("");
+    setLastAutosavedAt(null);
+    setDraftPrompt(null);
+    autosaveSuspendedRef.current = false;
     setLastSavedWords(0);
     setLastSavedElapsedSeconds(0);
     setElapsedSeconds(0);
     setRunning(false);
     lastCueSecondRef.current = null;
+    if (editorRef.current) {
+      editorRef.current.innerHTML = "";
+      editorRef.current.focus();
+    }
+  };
+
+  const handleRestoreDraft = () => {
+    if (!draftPrompt?.contentHtml) {
+      setDraftPrompt(null);
+      autosaveSuspendedRef.current = false;
+      return;
+    }
+
+    setContentHtml(normalizeEditorHtml(draftPrompt.contentHtml));
+    setLastAutosavedAt(draftPrompt.updatedAt ?? null);
+    setDraftPrompt(null);
+    autosaveSuspendedRef.current = false;
+  };
+
+  const handleDiscardDraft = () => {
+    removeStoredDraft(selectedProjectId);
+    setContentHtml("");
+    setLastAutosavedAt(null);
+    setDraftPrompt(null);
+    autosaveSuspendedRef.current = false;
     if (editorRef.current) {
       editorRef.current.innerHTML = "";
       editorRef.current.focus();
@@ -584,6 +828,14 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva com um cronômetro contínuo, receba sinais sonoros periódicos e registre o progresso no projeto.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+            <span>Rascunho local separado por projeto.</span>
+            <span>
+              {lastAutosavedAt
+                ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
+                : "Nenhum rascunho salvo localmente neste projeto."}
+            </span>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)_minmax(320px,auto)]">
@@ -592,7 +844,7 @@ export default function FocusEditor() {
             <select
               className="input h-[60px]"
               value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
+              onChange={handleProjectChange}
             >
               <option value="">Selecione um projeto</option>
               {projects.map((project) => {
@@ -818,6 +1070,12 @@ export default function FocusEditor() {
         message={feedback.message}
         primaryLabel={feedback.primaryLabel}
         onClose={() => setFeedback((current) => ({ ...current, open: false }))}
+      />
+      <DraftRecoveryModal
+        draft={draftPrompt}
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+        onClose={handleDiscardDraft}
       />
     </main>
   );
