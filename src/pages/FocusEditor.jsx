@@ -586,7 +586,7 @@ export default function FocusEditor() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)_minmax(320px,auto)]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)_minmax(360px,auto)]">
           <label className="flex flex-col gap-1">
             <span className="label">Projeto</span>
             <select
@@ -622,11 +622,11 @@ export default function FocusEditor() {
 
           <div className="flex flex-col gap-1">
             <span className="label invisible">Ações</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3 md:min-w-[360px]">
               {!running ? (
                 <button
                   type="button"
-                  className="btn-primary h-[60px] w-full justify-center"
+                  className="btn-primary h-[60px] w-full justify-center px-6"
                   onClick={() => void handleStart()}
                 >
                   Iniciar
@@ -634,7 +634,7 @@ export default function FocusEditor() {
               ) : (
                 <button
                   type="button"
-                  className="button h-[60px] w-full justify-center"
+                  className="button h-[60px] w-full justify-center px-6"
                   onClick={handlePause}
                 >
                   Pausar
@@ -642,7 +642,7 @@ export default function FocusEditor() {
               )}
               <button
                 type="button"
-                className="button h-[60px] w-full justify-center"
+                className="button h-[60px] w-full justify-center px-6"
                 onClick={handleResetTimer}
               >
                 Zerar tempo
@@ -689,12 +689,13 @@ export default function FocusEditor() {
                 value={toolbarState.block}
                 onChange={handleBlockChange}
                 options={BLOCK_OPTIONS}
+                width="164px"
               />
               <ToolbarSelect
                 value={toolbarState.fontSize}
                 onChange={handleFontSizeChange}
                 options={FONT_SIZE_OPTIONS}
-                width="132px"
+                width="112px"
               />
               <ToolbarSeparator />
               <ToolbarButton icon={Heading1} label="Heading 1" onClick={() => applyCommand("formatBlock", "h1")} active={toolbarState.block === "h1"} />
