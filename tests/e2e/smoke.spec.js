@@ -273,15 +273,18 @@ test("editor saves progress and exports txt, docx and pdf", async ({ page }) => 
   await page.getByRole("button", { name: "OK" }).click();
   await expect(page.getByText("Progresso salvo no projeto")).not.toBeVisible();
 
+  await page.getByRole("combobox", { name: "Formato de exportação" }).selectOption("txt");
   const txtDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar TXT" }).click();
+  await page.getByRole("button", { name: "Exportar" }).click();
   await expect((await txtDownload).suggestedFilename()).toMatch(/\.txt$/);
 
+  await page.getByRole("combobox", { name: "Formato de exportação" }).selectOption("doc");
   const docxDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar DOCX" }).click();
+  await page.getByRole("button", { name: "Exportar" }).click();
   await expect((await docxDownload).suggestedFilename()).toMatch(/\.docx$/);
 
+  await page.getByRole("combobox", { name: "Formato de exportação" }).selectOption("pdf");
   const pdfDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar PDF" }).click();
+  await page.getByRole("button", { name: "Exportar" }).click();
   await expect((await pdfDownload).suggestedFilename()).toMatch(/\.pdf$/);
 });
