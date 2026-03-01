@@ -43,6 +43,12 @@ export default function LoginModal({
   }, [open, initialMode]);
 
   useEffect(() => {
+    if (!open || !showSessionExpiredNotice) {
+      hasShownSessionNoticeRef.current = false;
+    }
+  }, [open, showSessionExpiredNotice]);
+
+  useEffect(() => {
     if (!open || !showSessionExpiredNotice || hasShownSessionNoticeRef.current) {
       return;
     }
