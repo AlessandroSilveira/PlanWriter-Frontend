@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar.jsx";
@@ -9,31 +9,41 @@ import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import RequirePasswordChange from "./routes/RequirePasswordChange.jsx";
 import AdminRoute from "./routes/AdminRoute.jsx";
 
-import Landing from "./pages/Landing.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
-import Projects from "./pages/Projects.jsx";
-import NewProject from "./pages/NewProject.jsx";
-import ProjectDetails from "./pages/ProjectDetails.jsx";
-import WritingDiary from "./pages/WritingDiary.jsx";
-import Reports from "./pages/Reports.jsx";
-import Buddies from "./pages/Buddies.jsx";
-import Events from "./pages/Events.jsx";
-import EventDetails from "./pages/EventDetails.jsx";
-import Validate from "./pages/Validate.jsx";
-import WinnerGoodies from "./pages/WinnerGoodies.jsx";
-import Certificate from "./pages/Certificate.jsx";
-import WordSprint from "./pages/WordSprint.jsx";
-import FocusEditor from "./pages/FocusEditor.jsx";
-import ProfileMe from "./pages/ProfileMe.jsx";
-import PublicProfile from "./pages/PublicProfile.jsx";
-import Resources from "./pages/Resources.jsx";
-import Login from "./pages/Login.jsx";
-import ChangePassword from "./pages/ChangePassword.jsx";
+const Landing = lazy(() => import("./pages/Landing.jsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
+const Projects = lazy(() => import("./pages/Projects.jsx"));
+const NewProject = lazy(() => import("./pages/NewProject.jsx"));
+const ProjectDetails = lazy(() => import("./pages/ProjectDetails.jsx"));
+const WritingDiary = lazy(() => import("./pages/WritingDiary.jsx"));
+const Reports = lazy(() => import("./pages/Reports.jsx"));
+const Buddies = lazy(() => import("./pages/Buddies.jsx"));
+const Events = lazy(() => import("./pages/Events.jsx"));
+const EventDetails = lazy(() => import("./pages/EventDetails.jsx"));
+const Validate = lazy(() => import("./pages/Validate.jsx"));
+const WinnerGoodies = lazy(() => import("./pages/WinnerGoodies.jsx"));
+const Certificate = lazy(() => import("./pages/Certificate.jsx"));
+const WordSprint = lazy(() => import("./pages/WordSprint.jsx"));
+const FocusEditor = lazy(() => import("./pages/FocusEditor.jsx"));
+const ProfileMe = lazy(() => import("./pages/ProfileMe.jsx"));
+const PublicProfile = lazy(() => import("./pages/PublicProfile.jsx"));
+const Resources = lazy(() => import("./pages/Resources.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
+const ChangePassword = lazy(() => import("./pages/ChangePassword.jsx"));
 
 // ADMIN
-import AdminEvents from "./pages/admin/AdminEvents.jsx";
-import AdminEventCreate from "./pages/admin/AdminEventCreate.jsx";
-import EditEvent from "./pages/admin/EditEvent.jsx";
+const AdminEvents = lazy(() => import("./pages/admin/AdminEvents.jsx"));
+const AdminEventCreate = lazy(() => import("./pages/admin/AdminEventCreate.jsx"));
+const EditEvent = lazy(() => import("./pages/admin/EditEvent.jsx"));
+
+function RouteFallback() {
+  return (
+    <div className="container py-8">
+      <div className="panel">
+        <p className="text-sm text-gray-600">Carregando...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -48,7 +58,8 @@ export default function App() {
         }}
       />
 
-      <Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         {/* 🌍 Públicas */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
@@ -297,7 +308,8 @@ export default function App() {
 
 
 
-      </Routes>
+        </Routes>
+      </Suspense>
 
       <LoginPopover
         open={loginOpen}

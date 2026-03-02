@@ -35,7 +35,7 @@ import {
   exportHtmlAsDoc,
   exportHtmlAsPdf,
   exportTextAsTxt,
-} from "../utils/exportText.js";
+} from "../utils/export/index.js";
 import { isOngoing } from "../utils/overviewAggregation";
 
 const EDITOR_DRAFTS_STORAGE_KEY = "pw_focus_editor_drafts_v1";
@@ -902,7 +902,7 @@ export default function FocusEditor() {
     );
   };
 
-  const handleExport = (format) => {
+  const handleExport = async (format) => {
     if (!plainText.trim()) {
       openFeedback(
         "warning",
@@ -915,16 +915,16 @@ export default function FocusEditor() {
     const title = selectedProject?.title ?? selectedProject?.name ?? "Editor de texto";
 
     if (format === "txt") {
-      exportTextAsTxt(plainText);
+      await exportTextAsTxt(plainText);
       return;
     }
 
     if (format === "doc") {
-      exportHtmlAsDoc(contentHtml, undefined, title);
+      await exportHtmlAsDoc(contentHtml, undefined, title);
       return;
     }
 
-    exportHtmlAsPdf(contentHtml, undefined, title);
+    await exportHtmlAsPdf(contentHtml, undefined, title);
   };
 
   const handleCopyText = async () => {
