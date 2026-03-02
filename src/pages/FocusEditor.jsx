@@ -44,6 +44,8 @@ const AUTOSAVE_DELAY_MS = 5000;
 const DEFAULT_DRAFT_SCOPE = "__sem_projeto__";
 const MAX_DRAFT_HISTORY_ENTRIES = 5;
 const DRAFT_HISTORY_MIN_INTERVAL_MS = 30000;
+const DEFAULT_SPRINT_DURATION_MINUTES = 15;
+const DEFAULT_SPRINT_GOAL = 300;
 
 function countWords(text) {
   return (text.trim().match(/\b\w+\b/gu) || []).length;
@@ -232,6 +234,17 @@ function appendStoredDraftVersion(projectId, snapshot, options = {}) {
 function normalizeFontSize(value) {
   const parsed = String(value ?? "").match(/[1-7]/)?.[0];
   return parsed ?? "3";
+}
+
+function resolveInitialEditorMode() {
+  if (typeof window === "undefined") return "free";
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("mode") === "sprint" || params.get("sprint") === "1") {
+    return "sprint";
+  }
+
+  return "free";
 }
 
 const fmt = (value) => (Number(value) || 0).toLocaleString("pt-BR");
@@ -474,9 +487,16 @@ export default function FocusEditor() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [contentHtml, setContentHtml] = useState("");
+  const [editorMode, setEditorMode] = useState(resolveInitialEditorMode);
   const [running, setRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [cueIntervalMinutes, setCueIntervalMinutes] = useState(10);
+  const [sprintDurationMinutes, setSprintDurationMinutes] = useState(
+    DEFAULT_SPRINT_DURATION_MINUTES
+  );
+  const [sprintGoal, setSprintGoal] = useState(DEFAULT_SPRINT_GOAL);
+  const [sprintBaselineWords, setSprintBaselineWords] = useState(0);
+  const [sprintFinished, setSprintFinished] = useState(false);
   const [exportFormat, setExportFormat] = useState("txt");
   const [lastSavedWords, setLastSavedWords] = useState(0);
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
@@ -517,6 +537,7 @@ export default function FocusEditor() {
   const currentDraftScope = getDraftScopeKey(selectedProjectId);
   const selectedProjectName =
     selectedProject?.title ?? selectedProject?.name ?? "Sem projeto";
+  const isSprintMode = editorMode === "sprint";
 
   const cueEverySeconds = cueIntervalMinutes > 0 ? cueIntervalMinutes * 60 : null;
   const nextCueInSeconds = cueEverySeconds
@@ -526,6 +547,26 @@ export default function FocusEditor() {
         return remainder === 0 ? cueEverySeconds : cueEverySeconds - remainder;
       })()
     : null;
+  const sprintDurationSeconds = Math.max(
+    0,
+    Math.floor((Number(sprintDurationMinutes) || 0) * 60)
+  );
+  const sprintSessionWords = isSprintMode
+    ? Math.max(0, wordCount - sprintBaselineWords)
+    : 0;
+  const sprintRemainingSeconds = isSprintMode
+    ? Math.max(0, sprintDurationSeconds - elapsedSeconds)
+    : null;
+  const sprintGoalProgress =
+    sprintGoal > 0 ? Math.min(100, Math.round((sprintSessionWords / sprintGoal) * 100)) : 0;
+  const sprintGoalReached = isSprintMode && sprintGoal > 0 && sprintSessionWords >= sprintGoal;
+  const sprintStatusLabel = !isSprintMode
+    ? "Modo livre"
+    : sprintFinished
+      ? "Encerrado"
+      : running
+        ? "Em andamento"
+        : "Pronto";
 
   const openFeedback = (type, title, message, primaryLabel = "OK") => {
     setFeedback({
@@ -683,6 +724,31 @@ export default function FocusEditor() {
   }, [cueEverySeconds, elapsedSeconds, running]);
 
   useEffect(() => {
+    if (!isSprintMode || !running || sprintDurationSeconds <= 0) return;
+    if (elapsedSeconds < sprintDurationSeconds) return;
+
+    setElapsedSeconds(sprintDurationSeconds);
+    setRunning(false);
+    setSprintFinished(true);
+    lastCueSecondRef.current = null;
+
+    openFeedback(
+      "success",
+      sprintGoalReached ? "Sprint concluida" : "Tempo encerrado",
+      sprintGoalReached
+        ? `Voce atingiu ${fmt(sprintSessionWords)} palavras e cumpriu a meta da sprint.`
+        : `A sprint terminou com ${fmt(sprintSessionWords)} palavras na sessao.`
+    );
+  }, [
+    elapsedSeconds,
+    isSprintMode,
+    running,
+    sprintDurationSeconds,
+    sprintGoalReached,
+    sprintSessionWords,
+  ]);
+
+  useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -792,6 +858,15 @@ export default function FocusEditor() {
   };
 
   const handleStart = async () => {
+    if (isSprintMode && (elapsedSeconds === 0 || sprintFinished)) {
+      setElapsedSeconds(0);
+      setLastSavedWords(wordCount);
+      setLastSavedElapsedSeconds(0);
+      setSprintBaselineWords(wordCount);
+      setSprintFinished(false);
+      lastCueSecondRef.current = null;
+    }
+
     setRunning(true);
     try {
       await ensureAudioContext(audioContextRef);
@@ -808,7 +883,36 @@ export default function FocusEditor() {
     setRunning(false);
     setElapsedSeconds(0);
     setLastSavedElapsedSeconds(0);
+    setSprintFinished(false);
+    setSprintBaselineWords(wordCount);
     lastCueSecondRef.current = null;
+  };
+
+  const handleModeChange = (nextMode) => {
+    if (nextMode === editorMode) return;
+
+    setEditorMode(nextMode);
+    setRunning(false);
+    setElapsedSeconds(0);
+    setLastSavedElapsedSeconds(0);
+    setSprintFinished(false);
+    setSprintBaselineWords(wordCount);
+    lastCueSecondRef.current = null;
+
+    if (nextMode === "sprint") {
+      setLastSavedWords(wordCount);
+    }
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (nextMode === "sprint") {
+        url.searchParams.set("mode", "sprint");
+      } else {
+        url.searchParams.delete("mode");
+        url.searchParams.delete("sprint");
+      }
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   };
 
   const handleProjectChange = (event) => {
@@ -972,7 +1076,9 @@ export default function FocusEditor() {
         wordsWritten: unsavedWords,
         minutes: deltaMinutes > 0 ? deltaMinutes : undefined,
         date: new Date().toISOString(),
-        notes: "Registrado pelo editor de texto com temporizador.",
+        notes: isSprintMode
+          ? "Registrado pelo editor em modo sprint."
+          : "Registrado pelo editor de texto com temporizador.",
       });
 
       setLastSavedWords(wordCount);
@@ -1000,7 +1106,7 @@ export default function FocusEditor() {
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">Editor de texto</h1>
           <p className="text-muted mt-2">
-            Escreva com um cronômetro contínuo, receba sinais sonoros periódicos e registre o progresso no projeto.
+            Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
             <span>Rascunho local separado por projeto.</span>
@@ -1012,7 +1118,30 @@ export default function FocusEditor() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_220px_auto]">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`button ${!isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
+            onClick={() => handleModeChange("free")}
+          >
+            Modo livre
+          </button>
+          <button
+            type="button"
+            className={`button ${isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
+            onClick={() => handleModeChange("sprint")}
+          >
+            Modo sprint
+          </button>
+        </div>
+
+        <div
+          className={`grid gap-4 ${
+            isSprintMode
+              ? "xl:grid-cols-[minmax(0,1.6fr)_160px_160px_200px_auto]"
+              : "md:grid-cols-[minmax(0,2fr)_220px_auto]"
+          }`}
+        >
           <label className="flex flex-col gap-1">
             <span className="label">Projeto</span>
             <select
@@ -1031,6 +1160,36 @@ export default function FocusEditor() {
               })}
             </select>
           </label>
+
+          {isSprintMode ? (
+            <label className="flex flex-col gap-1">
+              <span className="label">Duracao (min)</span>
+              <input
+                type="number"
+                min={1}
+                className="input h-12"
+                value={sprintDurationMinutes}
+                onChange={(event) =>
+                  setSprintDurationMinutes(Math.max(1, Number(event.target.value) || 1))
+                }
+              />
+            </label>
+          ) : null}
+
+          {isSprintMode ? (
+            <label className="flex flex-col gap-1">
+              <span className="label">Meta de palavras</span>
+              <input
+                type="number"
+                min={0}
+                className="input h-12"
+                value={sprintGoal}
+                onChange={(event) =>
+                  setSprintGoal(Math.max(0, Number(event.target.value) || 0))
+                }
+              />
+            </label>
+          ) : null}
 
           <label className="flex flex-col gap-1">
             <span className="label">Sinal sonoro (minutos)</span>
@@ -1077,34 +1236,88 @@ export default function FocusEditor() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="kpi">
-            <div className="label">Tempo decorrido</div>
-            <div className="value">{formatDuration(elapsedSeconds)}</div>
-            <div className="hint">Cronômetro contínuo</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Palavras no texto</div>
-            <div className="value">{fmt(wordCount)}</div>
-            <div className="hint">Contagem atual</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Pronto para salvar</div>
-            <div className="value">{fmt(unsavedWords)}</div>
-            <div className="hint">Delta ainda não registrado</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Próximo sinal</div>
-            <div className="value">
-              {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
+        {isSprintMode ? (
+          <>
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="kpi">
+                <div className="label">Tempo restante</div>
+                <div className="value">
+                  {formatDuration(sprintRemainingSeconds ?? sprintDurationSeconds)}
+                </div>
+                <div className="hint">
+                  {running ? "Contagem regressiva da sprint" : "Sprint configurada no editor"}
+                </div>
+              </div>
+              <div className="kpi">
+                <div className="label">Palavras na sessao</div>
+                <div className="value">{fmt(sprintSessionWords)}</div>
+                <div className="hint">Acumuladas desde o inicio da sprint</div>
+              </div>
+              <div className="kpi">
+                <div className="label">Meta da sprint</div>
+                <div className="value">{fmt(sprintGoal)}</div>
+                <div className="hint">
+                  {sprintGoal > 0
+                    ? `${fmt(Math.max(0, sprintGoal - sprintSessionWords))} para concluir`
+                    : "Defina uma meta para acompanhar a sessao"}
+                </div>
+              </div>
+              <div className="kpi">
+                <div className="label">Pronto para salvar</div>
+                <div className="value">{fmt(unsavedWords)}</div>
+                <div className="hint">Delta ainda nao registrado</div>
+              </div>
             </div>
-            <div className="hint">
-              {cueIntervalMinutes > 0
-                ? `A cada ${cueIntervalMinutes} min`
-                : "Sem alerta sonoro"}
+
+            <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="label">Status da sprint</div>
+                  <div className="mt-1 text-lg font-semibold text-[#111827]">
+                    {sprintStatusLabel}
+                  </div>
+                </div>
+                <div className="text-sm text-muted">
+                  Progresso da meta: {sprintGoalProgress}%{sprintGoalReached ? " (atingida)" : ""}
+                </div>
+                <div className="text-sm text-muted">
+                  {cueIntervalMinutes > 0
+                    ? `Sinal a cada ${cueIntervalMinutes} min`
+                    : "Sem alerta sonoro"}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="kpi">
+              <div className="label">Tempo decorrido</div>
+              <div className="value">{formatDuration(elapsedSeconds)}</div>
+              <div className="hint">Cronômetro contínuo</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Palavras no texto</div>
+              <div className="value">{fmt(wordCount)}</div>
+              <div className="hint">Contagem atual</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Pronto para salvar</div>
+              <div className="value">{fmt(unsavedWords)}</div>
+              <div className="hint">Delta ainda não registrado</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Próximo sinal</div>
+              <div className="value">
+                {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
+              </div>
+              <div className="hint">
+                {cueIntervalMinutes > 0
+                  ? `A cada ${cueIntervalMinutes} min`
+                  : "Sem alerta sonoro"}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
       </section>
