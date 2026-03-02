@@ -4,7 +4,7 @@ import FeedbackModal from "../components/FeedbackModal.jsx";
 import { saveSprintProgress } from "../api/progress";
 import { getProjects } from "../api/projects";
 import { isOngoing } from "../utils/overviewAggregation";
-import { exportTextAsDoc, exportTextAsPdf, exportTextAsTxt } from "../utils/exportText.js";
+import { exportTextAsDoc, exportTextAsPdf, exportTextAsTxt } from "../utils/export/index.js";
 
 
 /* util simples de contagem de palavras */
@@ -209,7 +209,7 @@ export default function WordSprint() {
     );
   };
 
-  const handleExport = (format) => {
+  const handleExport = async (format) => {
     if (!hasExportableText) {
       openFeedback(
         "warning",
@@ -225,16 +225,16 @@ export default function WordSprint() {
     const title = selectedProject?.title ?? selectedProject?.name ?? "Word Sprint";
 
     if (format === "txt") {
-      exportTextAsTxt(text);
+      await exportTextAsTxt(text);
       return;
     }
 
     if (format === "doc") {
-      exportTextAsDoc(text, undefined, title);
+      await exportTextAsDoc(text, undefined, title);
       return;
     }
 
-    exportTextAsPdf(text, undefined, title);
+    await exportTextAsPdf(text, undefined, title);
   };
 
   /* =========================
