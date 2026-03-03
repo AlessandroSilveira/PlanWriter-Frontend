@@ -22,7 +22,6 @@ const EventDetails = lazy(() => import("./pages/EventDetails.jsx"));
 const Validate = lazy(() => import("./pages/Validate.jsx"));
 const WinnerGoodies = lazy(() => import("./pages/WinnerGoodies.jsx"));
 const Certificate = lazy(() => import("./pages/Certificate.jsx"));
-const WordSprint = lazy(() => import("./pages/WordSprint.jsx"));
 const FocusEditor = lazy(() => import("./pages/FocusEditor.jsx"));
 const ProfileMe = lazy(() => import("./pages/ProfileMe.jsx"));
 const PublicProfile = lazy(() => import("./pages/PublicProfile.jsx"));
@@ -139,7 +138,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RequirePasswordChange>
-                <WordSprint />
+                <Navigate to="/editor?mode=sprint" replace />
               </RequirePasswordChange>
             </ProtectedRoute>
           }
