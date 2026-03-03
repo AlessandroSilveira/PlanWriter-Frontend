@@ -497,6 +497,7 @@ export default function FocusEditor() {
   const [sprintGoal, setSprintGoal] = useState(DEFAULT_SPRINT_GOAL);
   const [sprintBaselineWords, setSprintBaselineWords] = useState(0);
   const [sprintFinished, setSprintFinished] = useState(false);
+  const [sprintSavedToProject, setSprintSavedToProject] = useState(false);
   const [exportFormat, setExportFormat] = useState("txt");
   const [lastSavedWords, setLastSavedWords] = useState(0);
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
@@ -560,6 +561,7 @@ export default function FocusEditor() {
   const sprintGoalProgress =
     sprintGoal > 0 ? Math.min(100, Math.round((sprintSessionWords / sprintGoal) * 100)) : 0;
   const sprintGoalReached = isSprintMode && sprintGoal > 0 && sprintSessionWords >= sprintGoal;
+  const sprintHasStarted = isSprintMode && (elapsedSeconds > 0 || sprintBaselineWords > 0);
   const sprintStatusLabel = !isSprintMode
     ? "Modo livre"
     : sprintFinished
@@ -730,14 +732,15 @@ export default function FocusEditor() {
     setElapsedSeconds(sprintDurationSeconds);
     setRunning(false);
     setSprintFinished(true);
+    setSprintSavedToProject(false);
     lastCueSecondRef.current = null;
 
     openFeedback(
       "success",
-      sprintGoalReached ? "Sprint concluida" : "Tempo encerrado",
+      sprintGoalReached ? "Sprint finalizado" : "Tempo encerrado",
       sprintGoalReached
         ? `Voce atingiu ${fmt(sprintSessionWords)} palavras e cumpriu a meta da sprint.`
-        : `A sprint terminou com ${fmt(sprintSessionWords)} palavras na sessao.`
+        : "Bom trabalho, sessão concluída."
     );
   }, [
     elapsedSeconds,
@@ -858,12 +861,22 @@ export default function FocusEditor() {
   };
 
   const handleStart = async () => {
+    if (isSprintMode && !selectedProjectId) {
+      openFeedback(
+        "warning",
+        "Projeto obrigatório",
+        "Voce deve escolher um projeto antes de iniciar o sprint."
+      );
+      return;
+    }
+
     if (isSprintMode && (elapsedSeconds === 0 || sprintFinished)) {
       setElapsedSeconds(0);
       setLastSavedWords(wordCount);
       setLastSavedElapsedSeconds(0);
       setSprintBaselineWords(wordCount);
       setSprintFinished(false);
+      setSprintSavedToProject(false);
       lastCueSecondRef.current = null;
     }
 
@@ -883,9 +896,29 @@ export default function FocusEditor() {
     setRunning(false);
     setElapsedSeconds(0);
     setLastSavedElapsedSeconds(0);
-    setSprintFinished(false);
-    setSprintBaselineWords(wordCount);
+    if (isSprintMode) {
+      setSprintFinished(false);
+      setSprintSavedToProject(false);
+      setSprintBaselineWords(wordCount);
+      setLastSavedWords(wordCount);
+    } else {
+      setSprintFinished(false);
+      setSprintBaselineWords(wordCount);
+    }
     lastCueSecondRef.current = null;
+  };
+
+  const handleFinishSprintEarly = () => {
+    if (!isSprintMode || sprintFinished || !sprintHasStarted) return;
+
+    setRunning(false);
+    setSprintFinished(true);
+    setSprintSavedToProject(false);
+    openFeedback(
+      "success",
+      "Sprint concluido antes do tempo",
+      "Voce encerrou o sprint manualmente."
+    );
   };
 
   const handleModeChange = (nextMode) => {
@@ -896,6 +929,7 @@ export default function FocusEditor() {
     setElapsedSeconds(0);
     setLastSavedElapsedSeconds(0);
     setSprintFinished(false);
+    setSprintSavedToProject(false);
     setSprintBaselineWords(wordCount);
     lastCueSecondRef.current = null;
 
@@ -1057,23 +1091,40 @@ export default function FocusEditor() {
       return;
     }
 
-    if (unsavedWords <= 0) {
+    const wordsToPersist = isSprintMode ? sprintSessionWords : unsavedWords;
+
+    if (wordsToPersist <= 0) {
       openFeedback(
         "warning",
         "Nada para salvar",
-        "Ainda não há novas palavras para registrar no projeto."
+        isSprintMode
+          ? "Nenhuma palavra foi escrita nesta sessao."
+          : "Ainda não há novas palavras para registrar no projeto."
       );
       return;
     }
+
+    if (isSprintMode && !sprintFinished) {
+      openFeedback(
+        "warning",
+        "Sprint em andamento",
+        "Conclua ou finalize a sprint antes de salvar a sessao no projeto."
+      );
+      return;
+    }
+
+    if (isSprintMode && sprintSavedToProject) return;
 
     setSaving(true);
 
     try {
       const deltaSeconds = Math.max(0, elapsedSeconds - lastSavedElapsedSeconds);
-      const deltaMinutes = Math.floor(deltaSeconds / 60);
+      const deltaMinutes = isSprintMode
+        ? Math.max(1, Math.ceil(Math.max(1, elapsedSeconds) / 60))
+        : Math.floor(deltaSeconds / 60);
 
       await addProgress(selectedProjectId, {
-        wordsWritten: unsavedWords,
+        wordsWritten: wordsToPersist,
         minutes: deltaMinutes > 0 ? deltaMinutes : undefined,
         date: new Date().toISOString(),
         notes: isSprintMode
@@ -1081,12 +1132,18 @@ export default function FocusEditor() {
           : "Registrado pelo editor de texto com temporizador.",
       });
 
+      if (isSprintMode) {
+        setSprintSavedToProject(true);
+      }
+
       setLastSavedWords(wordCount);
       setLastSavedElapsedSeconds(elapsedSeconds);
       openFeedback(
         "success",
-        "Progresso salvo no projeto",
-        `${fmt(unsavedWords)} palavras foram registradas em ${selectedProject?.title ?? selectedProject?.name ?? "seu projeto"}.`
+        isSprintMode ? "Progresso salvo no projeto ✅" : "Progresso salvo no projeto",
+        isSprintMode
+          ? "Sua sessão foi salva com sucesso no projeto selecionado."
+          : `${fmt(wordsToPersist)} palavras foram registradas em ${selectedProject?.title ?? selectedProject?.name ?? "seu projeto"}.`
       );
     } catch (error) {
       console.error(error);
@@ -1123,6 +1180,7 @@ export default function FocusEditor() {
             type="button"
             className={`button ${!isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
             onClick={() => handleModeChange("free")}
+            disabled={running}
           >
             Modo livre
           </button>
@@ -1130,6 +1188,7 @@ export default function FocusEditor() {
             type="button"
             className={`button ${isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
             onClick={() => handleModeChange("sprint")}
+            disabled={running}
           >
             Modo sprint
           </button>
@@ -1148,6 +1207,7 @@ export default function FocusEditor() {
               className="input h-12"
               value={selectedProjectId}
               onChange={handleProjectChange}
+              disabled={isSprintMode && running}
             >
               <option value="">Selecione um projeto</option>
               {projects.map((project) => {
@@ -1169,6 +1229,7 @@ export default function FocusEditor() {
                 min={1}
                 className="input h-12"
                 value={sprintDurationMinutes}
+                disabled={running}
                 onChange={(event) =>
                   setSprintDurationMinutes(Math.max(1, Number(event.target.value) || 1))
                 }
@@ -1184,6 +1245,7 @@ export default function FocusEditor() {
                 min={0}
                 className="input h-12"
                 value={sprintGoal}
+                disabled={running}
                 onChange={(event) =>
                   setSprintGoal(Math.max(0, Number(event.target.value) || 0))
                 }
@@ -1229,9 +1291,19 @@ export default function FocusEditor() {
                 type="button"
                 className="button h-12 min-w-[132px] justify-center px-5"
                 onClick={handleResetTimer}
+                disabled={running}
               >
-                Zerar tempo
+                Resetar sessao
               </button>
+              {isSprintMode && !sprintFinished && sprintHasStarted ? (
+                <button
+                  type="button"
+                  className="btn-primary h-12 min-w-[160px] justify-center px-5"
+                  onClick={handleFinishSprintEarly}
+                >
+                  Concluir agora
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1264,8 +1336,12 @@ export default function FocusEditor() {
               </div>
               <div className="kpi">
                 <div className="label">Pronto para salvar</div>
-                <div className="value">{fmt(unsavedWords)}</div>
-                <div className="hint">Delta ainda nao registrado</div>
+                <div className="value">{fmt(sprintSessionWords)}</div>
+                <div className="hint">
+                  {sprintSavedToProject
+                    ? "Sessao ja registrada no projeto"
+                    : "Sessao pronta para registro"}
+                </div>
               </div>
             </div>
 
@@ -1281,9 +1357,11 @@ export default function FocusEditor() {
                   Progresso da meta: {sprintGoalProgress}%{sprintGoalReached ? " (atingida)" : ""}
                 </div>
                 <div className="text-sm text-muted">
-                  {cueIntervalMinutes > 0
-                    ? `Sinal a cada ${cueIntervalMinutes} min`
-                    : "Sem alerta sonoro"}
+                  {sprintSavedToProject
+                    ? "Sessao ja salva no projeto"
+                    : cueIntervalMinutes > 0
+                      ? `Sinal a cada ${cueIntervalMinutes} min`
+                      : "Sem alerta sonoro"}
                 </div>
               </div>
             </div>
@@ -1440,9 +1518,19 @@ export default function FocusEditor() {
             type="button"
             className="btn-primary"
             onClick={() => void handleSaveToProject()}
-            disabled={saving || unsavedWords <= 0 || !selectedProjectId}
+            disabled={
+              saving ||
+              !selectedProjectId ||
+              (isSprintMode
+                ? !sprintFinished || sprintSessionWords <= 0 || sprintSavedToProject
+                : unsavedWords <= 0)
+            }
           >
-            {saving ? "Salvando..." : "Salvar no projeto"}
+            {saving
+              ? "Salvando..."
+              : isSprintMode
+                ? "Salvar sessao no projeto"
+                : "Salvar no projeto"}
           </button>
         </div>
       </section>
