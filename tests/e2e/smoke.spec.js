@@ -288,3 +288,23 @@ test("editor saves progress and exports txt, docx and pdf", async ({ page }) => 
   await page.getByRole("button", { name: "Exportar" }).click();
   await expect((await pdfDownload).suggestedFilename()).toMatch(/\.pdf$/);
 });
+
+test("legacy sprint route redirects to editor sprint mode", async ({ page }) => {
+  const state = createMockState();
+  await installApiMocks(page, state);
+  await seedAuthenticatedSession(page, state);
+
+  await page.goto("/sprint");
+
+  await expect(page).toHaveURL(/\/editor\?mode=sprint$/);
+  await expect(page.getByText("Editor de texto")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Modo sprint" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Modo livre" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
+  await expect(page.getByRole("link", { name: "Sprint" })).toHaveCount(0);
+});

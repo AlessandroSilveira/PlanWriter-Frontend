@@ -44,6 +44,8 @@ const AUTOSAVE_DELAY_MS = 5000;
 const DEFAULT_DRAFT_SCOPE = "__sem_projeto__";
 const MAX_DRAFT_HISTORY_ENTRIES = 5;
 const DRAFT_HISTORY_MIN_INTERVAL_MS = 30000;
+const DEFAULT_SPRINT_DURATION_MINUTES = 15;
+const DEFAULT_SPRINT_GOAL = 300;
 
 function countWords(text) {
   return (text.trim().match(/\b\w+\b/gu) || []).length;
@@ -232,6 +234,17 @@ function appendStoredDraftVersion(projectId, snapshot, options = {}) {
 function normalizeFontSize(value) {
   const parsed = String(value ?? "").match(/[1-7]/)?.[0];
   return parsed ?? "3";
+}
+
+function resolveInitialEditorMode() {
+  if (typeof window === "undefined") return "free";
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("mode") === "sprint" || params.get("sprint") === "1") {
+    return "sprint";
+  }
+
+  return "free";
 }
 
 const fmt = (value) => (Number(value) || 0).toLocaleString("pt-BR");
@@ -474,9 +487,17 @@ export default function FocusEditor() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [contentHtml, setContentHtml] = useState("");
+  const [editorMode, setEditorMode] = useState(resolveInitialEditorMode);
   const [running, setRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [cueIntervalMinutes, setCueIntervalMinutes] = useState(10);
+  const [sprintDurationMinutes, setSprintDurationMinutes] = useState(
+    DEFAULT_SPRINT_DURATION_MINUTES
+  );
+  const [sprintGoal, setSprintGoal] = useState(DEFAULT_SPRINT_GOAL);
+  const [sprintBaselineWords, setSprintBaselineWords] = useState(0);
+  const [sprintFinished, setSprintFinished] = useState(false);
+  const [sprintSavedToProject, setSprintSavedToProject] = useState(false);
   const [exportFormat, setExportFormat] = useState("txt");
   const [lastSavedWords, setLastSavedWords] = useState(0);
   const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0);
@@ -517,6 +538,7 @@ export default function FocusEditor() {
   const currentDraftScope = getDraftScopeKey(selectedProjectId);
   const selectedProjectName =
     selectedProject?.title ?? selectedProject?.name ?? "Sem projeto";
+  const isSprintMode = editorMode === "sprint";
 
   const cueEverySeconds = cueIntervalMinutes > 0 ? cueIntervalMinutes * 60 : null;
   const nextCueInSeconds = cueEverySeconds
@@ -526,6 +548,27 @@ export default function FocusEditor() {
         return remainder === 0 ? cueEverySeconds : cueEverySeconds - remainder;
       })()
     : null;
+  const sprintDurationSeconds = Math.max(
+    0,
+    Math.floor((Number(sprintDurationMinutes) || 0) * 60)
+  );
+  const sprintSessionWords = isSprintMode
+    ? Math.max(0, wordCount - sprintBaselineWords)
+    : 0;
+  const sprintRemainingSeconds = isSprintMode
+    ? Math.max(0, sprintDurationSeconds - elapsedSeconds)
+    : null;
+  const sprintGoalProgress =
+    sprintGoal > 0 ? Math.min(100, Math.round((sprintSessionWords / sprintGoal) * 100)) : 0;
+  const sprintGoalReached = isSprintMode && sprintGoal > 0 && sprintSessionWords >= sprintGoal;
+  const sprintHasStarted = isSprintMode && (elapsedSeconds > 0 || sprintBaselineWords > 0);
+  const sprintStatusLabel = !isSprintMode
+    ? "Modo livre"
+    : sprintFinished
+      ? "Encerrado"
+      : running
+        ? "Em andamento"
+        : "Pronto";
 
   const openFeedback = (type, title, message, primaryLabel = "OK") => {
     setFeedback({
@@ -683,6 +726,32 @@ export default function FocusEditor() {
   }, [cueEverySeconds, elapsedSeconds, running]);
 
   useEffect(() => {
+    if (!isSprintMode || !running || sprintDurationSeconds <= 0) return;
+    if (elapsedSeconds < sprintDurationSeconds) return;
+
+    setElapsedSeconds(sprintDurationSeconds);
+    setRunning(false);
+    setSprintFinished(true);
+    setSprintSavedToProject(false);
+    lastCueSecondRef.current = null;
+
+    openFeedback(
+      "success",
+      sprintGoalReached ? "Sprint finalizado" : "Tempo encerrado",
+      sprintGoalReached
+        ? `Voce atingiu ${fmt(sprintSessionWords)} palavras e cumpriu a meta da sprint.`
+        : "Bom trabalho, sessão concluída."
+    );
+  }, [
+    elapsedSeconds,
+    isSprintMode,
+    running,
+    sprintDurationSeconds,
+    sprintGoalReached,
+    sprintSessionWords,
+  ]);
+
+  useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -792,6 +861,25 @@ export default function FocusEditor() {
   };
 
   const handleStart = async () => {
+    if (isSprintMode && !selectedProjectId) {
+      openFeedback(
+        "warning",
+        "Projeto obrigatório",
+        "Voce deve escolher um projeto antes de iniciar o sprint."
+      );
+      return;
+    }
+
+    if (isSprintMode && (elapsedSeconds === 0 || sprintFinished)) {
+      setElapsedSeconds(0);
+      setLastSavedWords(wordCount);
+      setLastSavedElapsedSeconds(0);
+      setSprintBaselineWords(wordCount);
+      setSprintFinished(false);
+      setSprintSavedToProject(false);
+      lastCueSecondRef.current = null;
+    }
+
     setRunning(true);
     try {
       await ensureAudioContext(audioContextRef);
@@ -808,7 +896,57 @@ export default function FocusEditor() {
     setRunning(false);
     setElapsedSeconds(0);
     setLastSavedElapsedSeconds(0);
+    if (isSprintMode) {
+      setSprintFinished(false);
+      setSprintSavedToProject(false);
+      setSprintBaselineWords(wordCount);
+      setLastSavedWords(wordCount);
+    } else {
+      setSprintFinished(false);
+      setSprintBaselineWords(wordCount);
+    }
     lastCueSecondRef.current = null;
+  };
+
+  const handleFinishSprintEarly = () => {
+    if (!isSprintMode || sprintFinished || !sprintHasStarted) return;
+
+    setRunning(false);
+    setSprintFinished(true);
+    setSprintSavedToProject(false);
+    openFeedback(
+      "success",
+      "Sprint concluido antes do tempo",
+      "Voce encerrou o sprint manualmente."
+    );
+  };
+
+  const handleModeChange = (nextMode) => {
+    if (nextMode === editorMode) return;
+
+    setEditorMode(nextMode);
+    setRunning(false);
+    setElapsedSeconds(0);
+    setLastSavedElapsedSeconds(0);
+    setSprintFinished(false);
+    setSprintSavedToProject(false);
+    setSprintBaselineWords(wordCount);
+    lastCueSecondRef.current = null;
+
+    if (nextMode === "sprint") {
+      setLastSavedWords(wordCount);
+    }
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (nextMode === "sprint") {
+        url.searchParams.set("mode", "sprint");
+      } else {
+        url.searchParams.delete("mode");
+        url.searchParams.delete("sprint");
+      }
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   };
 
   const handleProjectChange = (event) => {
@@ -953,34 +1091,59 @@ export default function FocusEditor() {
       return;
     }
 
-    if (unsavedWords <= 0) {
+    const wordsToPersist = isSprintMode ? sprintSessionWords : unsavedWords;
+
+    if (wordsToPersist <= 0) {
       openFeedback(
         "warning",
         "Nada para salvar",
-        "Ainda não há novas palavras para registrar no projeto."
+        isSprintMode
+          ? "Nenhuma palavra foi escrita nesta sessao."
+          : "Ainda não há novas palavras para registrar no projeto."
       );
       return;
     }
+
+    if (isSprintMode && !sprintFinished) {
+      openFeedback(
+        "warning",
+        "Sprint em andamento",
+        "Conclua ou finalize a sprint antes de salvar a sessao no projeto."
+      );
+      return;
+    }
+
+    if (isSprintMode && sprintSavedToProject) return;
 
     setSaving(true);
 
     try {
       const deltaSeconds = Math.max(0, elapsedSeconds - lastSavedElapsedSeconds);
-      const deltaMinutes = Math.floor(deltaSeconds / 60);
+      const deltaMinutes = isSprintMode
+        ? Math.max(1, Math.ceil(Math.max(1, elapsedSeconds) / 60))
+        : Math.floor(deltaSeconds / 60);
 
       await addProgress(selectedProjectId, {
-        wordsWritten: unsavedWords,
+        wordsWritten: wordsToPersist,
         minutes: deltaMinutes > 0 ? deltaMinutes : undefined,
         date: new Date().toISOString(),
-        notes: "Registrado pelo editor de texto com temporizador.",
+        notes: isSprintMode
+          ? "Registrado pelo editor em modo sprint."
+          : "Registrado pelo editor de texto com temporizador.",
       });
+
+      if (isSprintMode) {
+        setSprintSavedToProject(true);
+      }
 
       setLastSavedWords(wordCount);
       setLastSavedElapsedSeconds(elapsedSeconds);
       openFeedback(
         "success",
-        "Progresso salvo no projeto",
-        `${fmt(unsavedWords)} palavras foram registradas em ${selectedProject?.title ?? selectedProject?.name ?? "seu projeto"}.`
+        isSprintMode ? "Progresso salvo no projeto ✅" : "Progresso salvo no projeto",
+        isSprintMode
+          ? "Sua sessão foi salva com sucesso no projeto selecionado."
+          : `${fmt(wordsToPersist)} palavras foram registradas em ${selectedProject?.title ?? selectedProject?.name ?? "seu projeto"}.`
       );
     } catch (error) {
       console.error(error);
@@ -1000,113 +1163,257 @@ export default function FocusEditor() {
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">Editor de texto</h1>
           <p className="text-muted mt-2">
-            Escreva com um cronômetro contínuo, receba sinais sonoros periódicos e registre o progresso no projeto.
+            Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-            <span>Rascunho local separado por projeto.</span>
-            <span>
-              {lastAutosavedAt
-                ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
-                : "Nenhum rascunho salvo localmente neste projeto."}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_220px_auto]">
-          <label className="flex flex-col gap-1">
-            <span className="label">Projeto</span>
-            <select
-              className="input h-12"
-              value={selectedProjectId}
-              onChange={handleProjectChange}
-            >
-              <option value="">Selecione um projeto</option>
-              {projects.map((project) => {
-                const projectId = String(project.id ?? project.projectId);
-                return (
-                  <option key={projectId} value={projectId}>
-                    {project.title ?? project.name ?? "Projeto sem titulo"}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="label">Sinal sonoro (minutos)</span>
-            <input
-              type="number"
-              min={0}
-              className="input h-12"
-              value={cueIntervalMinutes}
-              onChange={(event) =>
-                setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
-              }
-            />
-            <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
-          </label>
-
-          <div className="flex flex-col gap-1">
-            <span className="label invisible">Ações</span>
-            <div className="flex flex-wrap gap-2">
-              {!running ? (
-                <button
-                  type="button"
-                  className="btn-primary h-12 min-w-[132px] justify-center px-5"
-                  onClick={() => void handleStart()}
-                >
-                  Iniciar
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="button h-12 min-w-[132px] justify-center px-5"
-                  onClick={handlePause}
-                >
-                  Pausar
-                </button>
-              )}
+          <div className="mt-4">
+            <div className="relative z-10 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
               <button
                 type="button"
-                className="button h-12 min-w-[132px] justify-center px-5"
-                onClick={handleResetTimer}
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  !isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("free")}
+                disabled={running}
+                aria-pressed={!isSprintMode}
               >
-                Zerar tempo
+                Modo livre
+              </button>
+              <button
+                type="button"
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("sprint")}
+                disabled={running}
+                aria-pressed={isSprintMode}
+              >
+                Modo sprint
               </button>
             </div>
+            <div className="-mt-px rounded-b-2xl rounded-tr-2xl border border-black/10 bg-white/70 px-4 py-4 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+                <span>Rascunho local separado por projeto.</span>
+                <span>
+                  {lastAutosavedAt
+                    ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
+                    : "Nenhum rascunho salvo localmente neste projeto."}
+                </span>
+              </div>
+
+              <div
+                className={`grid gap-4 ${
+                  isSprintMode
+                    ? "xl:grid-cols-[minmax(0,1.6fr)_160px_160px_200px_auto]"
+                    : "md:grid-cols-[minmax(0,2fr)_220px_auto]"
+                }`}
+              >
+                <label className="flex flex-col gap-1">
+                  <span className="label">Projeto</span>
+                  <select
+                    className="input h-12"
+                    value={selectedProjectId}
+                    onChange={handleProjectChange}
+                    disabled={isSprintMode && running}
+                  >
+                    <option value="">Selecione um projeto</option>
+                    {projects.map((project) => {
+                      const projectId = String(project.id ?? project.projectId);
+                      return (
+                        <option key={projectId} value={projectId}>
+                          {project.title ?? project.name ?? "Projeto sem titulo"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+
+                {isSprintMode ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="label">Duracao (min)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      className="input h-12"
+                      value={sprintDurationMinutes}
+                      disabled={running}
+                      onChange={(event) =>
+                        setSprintDurationMinutes(Math.max(1, Number(event.target.value) || 1))
+                      }
+                    />
+                  </label>
+                ) : null}
+
+                {isSprintMode ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="label">Meta de palavras</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input h-12"
+                      value={sprintGoal}
+                      disabled={running}
+                      onChange={(event) =>
+                        setSprintGoal(Math.max(0, Number(event.target.value) || 0))
+                      }
+                    />
+                  </label>
+                ) : null}
+
+                <label className="flex flex-col gap-1">
+                  <span className="label">Sinal sonoro (minutos)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input h-12"
+                    value={cueIntervalMinutes}
+                    onChange={(event) =>
+                      setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
+                    }
+                  />
+                  <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
+                </label>
+
+                <div className="flex flex-col gap-1">
+                  <span className="label invisible">Ações</span>
+                  <div className="flex flex-wrap gap-2">
+                    {!running ? (
+                      <button
+                        type="button"
+                        className="btn-primary h-12 min-w-[132px] justify-center px-5"
+                        onClick={() => void handleStart()}
+                      >
+                        Iniciar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="button h-12 min-w-[132px] justify-center px-5"
+                        onClick={handlePause}
+                      >
+                        Pausar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="button h-12 min-w-[132px] justify-center px-5"
+                      onClick={handleResetTimer}
+                      disabled={running}
+                    >
+                      Resetar sessao
+                    </button>
+                    {isSprintMode && !sprintFinished && sprintHasStarted ? (
+                      <button
+                        type="button"
+                        className="btn-primary h-12 min-w-[160px] justify-center px-5"
+                        onClick={handleFinishSprintEarly}
+                      >
+                        Concluir agora
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {isSprintMode ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="kpi">
+                      <div className="label">Tempo restante</div>
+                      <div className="value">
+                        {formatDuration(sprintRemainingSeconds ?? sprintDurationSeconds)}
+                      </div>
+                      <div className="hint">
+                        {running
+                          ? "Contagem regressiva da sprint"
+                          : "Sprint configurada no editor"}
+                      </div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Palavras na sessao</div>
+                      <div className="value">{fmt(sprintSessionWords)}</div>
+                      <div className="hint">Acumuladas desde o inicio da sprint</div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Meta da sprint</div>
+                      <div className="value">{fmt(sprintGoal)}</div>
+                      <div className="hint">
+                        {sprintGoal > 0
+                          ? `${fmt(Math.max(0, sprintGoal - sprintSessionWords))} para concluir`
+                          : "Defina uma meta para acompanhar a sessao"}
+                      </div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Pronto para salvar</div>
+                      <div className="value">{fmt(sprintSessionWords)}</div>
+                      <div className="hint">
+                        {sprintSavedToProject
+                          ? "Sessao ja registrada no projeto"
+                          : "Sessao pronta para registro"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="label">Status da sprint</div>
+                        <div className="mt-1 text-lg font-semibold text-[#111827]">
+                          {sprintStatusLabel}
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted">
+                        Progresso da meta: {sprintGoalProgress}%
+                        {sprintGoalReached ? " (atingida)" : ""}
+                      </div>
+                      <div className="text-sm text-muted">
+                        {sprintSavedToProject
+                          ? "Sessao ja salva no projeto"
+                          : cueIntervalMinutes > 0
+                            ? `Sinal a cada ${cueIntervalMinutes} min`
+                            : "Sem alerta sonoro"}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="kpi">
+                    <div className="label">Tempo decorrido</div>
+                    <div className="value">{formatDuration(elapsedSeconds)}</div>
+                    <div className="hint">Cronômetro contínuo</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Palavras no texto</div>
+                    <div className="value">{fmt(wordCount)}</div>
+                    <div className="hint">Contagem atual</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Pronto para salvar</div>
+                    <div className="value">{fmt(unsavedWords)}</div>
+                    <div className="hint">Delta ainda não registrado</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Próximo sinal</div>
+                    <div className="value">
+                      {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
+                    </div>
+                    <div className="hint">
+                      {cueIntervalMinutes > 0
+                        ? `A cada ${cueIntervalMinutes} min`
+                        : "Sem alerta sonoro"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
+            </div>
           </div>
         </div>
-
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="kpi">
-            <div className="label">Tempo decorrido</div>
-            <div className="value">{formatDuration(elapsedSeconds)}</div>
-            <div className="hint">Cronômetro contínuo</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Palavras no texto</div>
-            <div className="value">{fmt(wordCount)}</div>
-            <div className="hint">Contagem atual</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Pronto para salvar</div>
-            <div className="value">{fmt(unsavedWords)}</div>
-            <div className="hint">Delta ainda não registrado</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Próximo sinal</div>
-            <div className="value">
-              {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
-            </div>
-            <div className="hint">
-              {cueIntervalMinutes > 0
-                ? `A cada ${cueIntervalMinutes} min`
-                : "Sem alerta sonoro"}
-            </div>
-          </div>
-        </div>
-
-        <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
       </section>
 
       <section className="panel space-y-4">
@@ -1227,9 +1534,19 @@ export default function FocusEditor() {
             type="button"
             className="btn-primary"
             onClick={() => void handleSaveToProject()}
-            disabled={saving || unsavedWords <= 0 || !selectedProjectId}
+            disabled={
+              saving ||
+              !selectedProjectId ||
+              (isSprintMode
+                ? !sprintFinished || sprintSessionWords <= 0 || sprintSavedToProject
+                : unsavedWords <= 0)
+            }
           >
-            {saving ? "Salvando..." : "Salvar no projeto"}
+            {saving
+              ? "Salvando..."
+              : isSprintMode
+                ? "Salvar sessao no projeto"
+                : "Salvar no projeto"}
           </button>
         </div>
       </section>
