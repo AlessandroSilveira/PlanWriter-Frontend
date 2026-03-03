@@ -1165,13 +1165,13 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
-          <div className="mt-4 inline-flex rounded-2xl border border-black/10 bg-white p-1 shadow-sm">
+          <div className="mt-4 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
             <button
               type="button"
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+              className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
                 !isSprintMode
-                  ? "bg-[#2f5d73] text-white shadow-sm"
-                  : "text-[#4b5563] hover:bg-[#f5f1e8]"
+                  ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                  : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
               }`}
               onClick={() => handleModeChange("free")}
               disabled={running}
@@ -1181,10 +1181,10 @@ export default function FocusEditor() {
             </button>
             <button
               type="button"
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+              className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
                 isSprintMode
-                  ? "bg-[#2f5d73] text-white shadow-sm"
-                  : "text-[#4b5563] hover:bg-[#f5f1e8]"
+                  ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                  : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
               }`}
               onClick={() => handleModeChange("sprint")}
               disabled={running}

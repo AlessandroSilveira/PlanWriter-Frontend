@@ -298,6 +298,13 @@ test("legacy sprint route redirects to editor sprint mode", async ({ page }) => 
 
   await expect(page).toHaveURL(/\/editor\?mode=sprint$/);
   await expect(page.getByText("Editor de texto")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Modo sprint" })).toHaveClass(/bg-\[#2f5d73\]/);
+  await expect(page.getByRole("button", { name: "Modo sprint" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Modo livre" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
   await expect(page.getByRole("link", { name: "Sprint" })).toHaveCount(0);
 });
