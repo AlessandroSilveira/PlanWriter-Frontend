@@ -1165,41 +1165,45 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
-          <div className="mt-4 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
-            <button
-              type="button"
-              className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
-                !isSprintMode
-                  ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
-                  : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
-              }`}
-              onClick={() => handleModeChange("free")}
-              disabled={running}
-              aria-pressed={!isSprintMode}
-            >
-              Modo livre
-            </button>
-            <button
-              type="button"
-              className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
-                isSprintMode
-                  ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
-                  : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
-              }`}
-              onClick={() => handleModeChange("sprint")}
-              disabled={running}
-              aria-pressed={isSprintMode}
-            >
-              Modo sprint
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-            <span>Rascunho local separado por projeto.</span>
-            <span>
-              {lastAutosavedAt
-                ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
-                : "Nenhum rascunho salvo localmente neste projeto."}
-            </span>
+          <div className="mt-4 max-w-fit">
+            <div className="relative z-10 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
+              <button
+                type="button"
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  !isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("free")}
+                disabled={running}
+                aria-pressed={!isSprintMode}
+              >
+                Modo livre
+              </button>
+              <button
+                type="button"
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("sprint")}
+                disabled={running}
+                aria-pressed={isSprintMode}
+              >
+                Modo sprint
+              </button>
+            </div>
+            <div className="-mt-px rounded-b-xl rounded-tr-xl border border-black/10 bg-white/70 px-4 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+                <span>Rascunho local separado por projeto.</span>
+                <span>
+                  {lastAutosavedAt
+                    ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
+                    : "Nenhum rascunho salvo localmente neste projeto."}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
