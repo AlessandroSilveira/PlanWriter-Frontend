@@ -1165,6 +1165,34 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
+          <div className="mt-4 inline-flex rounded-2xl border border-black/10 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                !isSprintMode
+                  ? "bg-[#2f5d73] text-white shadow-sm"
+                  : "text-[#4b5563] hover:bg-[#f5f1e8]"
+              }`}
+              onClick={() => handleModeChange("free")}
+              disabled={running}
+              aria-pressed={!isSprintMode}
+            >
+              Modo livre
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                isSprintMode
+                  ? "bg-[#2f5d73] text-white shadow-sm"
+                  : "text-[#4b5563] hover:bg-[#f5f1e8]"
+              }`}
+              onClick={() => handleModeChange("sprint")}
+              disabled={running}
+              aria-pressed={isSprintMode}
+            >
+              Modo sprint
+            </button>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
             <span>Rascunho local separado por projeto.</span>
             <span>
@@ -1173,25 +1201,6 @@ export default function FocusEditor() {
                 : "Nenhum rascunho salvo localmente neste projeto."}
             </span>
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={`button ${!isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
-            onClick={() => handleModeChange("free")}
-            disabled={running}
-          >
-            Modo livre
-          </button>
-          <button
-            type="button"
-            className={`button ${isSprintMode ? "bg-[#2f5d73] text-white border-[#2f5d73]" : ""}`}
-            onClick={() => handleModeChange("sprint")}
-            disabled={running}
-          >
-            Modo sprint
-          </button>
         </div>
 
         <div
