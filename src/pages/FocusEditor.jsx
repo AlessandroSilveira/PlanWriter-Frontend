@@ -1165,7 +1165,7 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
-          <div className="mt-4 max-w-fit">
+          <div className="mt-4">
             <div className="relative z-10 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
               <button
                 type="button"
@@ -1194,7 +1194,7 @@ export default function FocusEditor() {
                 Modo sprint
               </button>
             </div>
-            <div className="-mt-px rounded-b-xl rounded-tr-xl border border-black/10 bg-white/70 px-4 py-3 shadow-sm">
+            <div className="-mt-px rounded-b-2xl rounded-tr-2xl border border-black/10 bg-white/70 px-4 py-4 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
                 <span>Rascunho local separado por projeto.</span>
                 <span>
@@ -1203,214 +1203,217 @@ export default function FocusEditor() {
                     : "Nenhum rascunho salvo localmente neste projeto."}
                 </span>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div
-          className={`grid gap-4 ${
-            isSprintMode
-              ? "xl:grid-cols-[minmax(0,1.6fr)_160px_160px_200px_auto]"
-              : "md:grid-cols-[minmax(0,2fr)_220px_auto]"
-          }`}
-        >
-          <label className="flex flex-col gap-1">
-            <span className="label">Projeto</span>
-            <select
-              className="input h-12"
-              value={selectedProjectId}
-              onChange={handleProjectChange}
-              disabled={isSprintMode && running}
-            >
-              <option value="">Selecione um projeto</option>
-              {projects.map((project) => {
-                const projectId = String(project.id ?? project.projectId);
-                return (
-                  <option key={projectId} value={projectId}>
-                    {project.title ?? project.name ?? "Projeto sem titulo"}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-
-          {isSprintMode ? (
-            <label className="flex flex-col gap-1">
-              <span className="label">Duracao (min)</span>
-              <input
-                type="number"
-                min={1}
-                className="input h-12"
-                value={sprintDurationMinutes}
-                disabled={running}
-                onChange={(event) =>
-                  setSprintDurationMinutes(Math.max(1, Number(event.target.value) || 1))
-                }
-              />
-            </label>
-          ) : null}
-
-          {isSprintMode ? (
-            <label className="flex flex-col gap-1">
-              <span className="label">Meta de palavras</span>
-              <input
-                type="number"
-                min={0}
-                className="input h-12"
-                value={sprintGoal}
-                disabled={running}
-                onChange={(event) =>
-                  setSprintGoal(Math.max(0, Number(event.target.value) || 0))
-                }
-              />
-            </label>
-          ) : null}
-
-          <label className="flex flex-col gap-1">
-            <span className="label">Sinal sonoro (minutos)</span>
-            <input
-              type="number"
-              min={0}
-              className="input h-12"
-              value={cueIntervalMinutes}
-              onChange={(event) =>
-                setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
-              }
-            />
-            <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
-          </label>
-
-          <div className="flex flex-col gap-1">
-            <span className="label invisible">Ações</span>
-            <div className="flex flex-wrap gap-2">
-              {!running ? (
-                <button
-                  type="button"
-                  className="btn-primary h-12 min-w-[132px] justify-center px-5"
-                  onClick={() => void handleStart()}
-                >
-                  Iniciar
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="button h-12 min-w-[132px] justify-center px-5"
-                  onClick={handlePause}
-                >
-                  Pausar
-                </button>
-              )}
-              <button
-                type="button"
-                className="button h-12 min-w-[132px] justify-center px-5"
-                onClick={handleResetTimer}
-                disabled={running}
+              <div
+                className={`grid gap-4 ${
+                  isSprintMode
+                    ? "xl:grid-cols-[minmax(0,1.6fr)_160px_160px_200px_auto]"
+                    : "md:grid-cols-[minmax(0,2fr)_220px_auto]"
+                }`}
               >
-                Resetar sessao
-              </button>
-              {isSprintMode && !sprintFinished && sprintHasStarted ? (
-                <button
-                  type="button"
-                  className="btn-primary h-12 min-w-[160px] justify-center px-5"
-                  onClick={handleFinishSprintEarly}
-                >
-                  Concluir agora
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
+                <label className="flex flex-col gap-1">
+                  <span className="label">Projeto</span>
+                  <select
+                    className="input h-12"
+                    value={selectedProjectId}
+                    onChange={handleProjectChange}
+                    disabled={isSprintMode && running}
+                  >
+                    <option value="">Selecione um projeto</option>
+                    {projects.map((project) => {
+                      const projectId = String(project.id ?? project.projectId);
+                      return (
+                        <option key={projectId} value={projectId}>
+                          {project.title ?? project.name ?? "Projeto sem titulo"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
 
-        {isSprintMode ? (
-          <>
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="kpi">
-                <div className="label">Tempo restante</div>
-                <div className="value">
-                  {formatDuration(sprintRemainingSeconds ?? sprintDurationSeconds)}
-                </div>
-                <div className="hint">
-                  {running ? "Contagem regressiva da sprint" : "Sprint configurada no editor"}
-                </div>
-              </div>
-              <div className="kpi">
-                <div className="label">Palavras na sessao</div>
-                <div className="value">{fmt(sprintSessionWords)}</div>
-                <div className="hint">Acumuladas desde o inicio da sprint</div>
-              </div>
-              <div className="kpi">
-                <div className="label">Meta da sprint</div>
-                <div className="value">{fmt(sprintGoal)}</div>
-                <div className="hint">
-                  {sprintGoal > 0
-                    ? `${fmt(Math.max(0, sprintGoal - sprintSessionWords))} para concluir`
-                    : "Defina uma meta para acompanhar a sessao"}
-                </div>
-              </div>
-              <div className="kpi">
-                <div className="label">Pronto para salvar</div>
-                <div className="value">{fmt(sprintSessionWords)}</div>
-                <div className="hint">
-                  {sprintSavedToProject
-                    ? "Sessao ja registrada no projeto"
-                    : "Sessao pronta para registro"}
-                </div>
-              </div>
-            </div>
+                {isSprintMode ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="label">Duracao (min)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      className="input h-12"
+                      value={sprintDurationMinutes}
+                      disabled={running}
+                      onChange={(event) =>
+                        setSprintDurationMinutes(Math.max(1, Number(event.target.value) || 1))
+                      }
+                    />
+                  </label>
+                ) : null}
 
-            <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="label">Status da sprint</div>
-                  <div className="mt-1 text-lg font-semibold text-[#111827]">
-                    {sprintStatusLabel}
+                {isSprintMode ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="label">Meta de palavras</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input h-12"
+                      value={sprintGoal}
+                      disabled={running}
+                      onChange={(event) =>
+                        setSprintGoal(Math.max(0, Number(event.target.value) || 0))
+                      }
+                    />
+                  </label>
+                ) : null}
+
+                <label className="flex flex-col gap-1">
+                  <span className="label">Sinal sonoro (minutos)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input h-12"
+                    value={cueIntervalMinutes}
+                    onChange={(event) =>
+                      setCueIntervalMinutes(Math.max(0, Number(event.target.value) || 0))
+                    }
+                  />
+                  <span className="pl-1 text-xs text-muted">Use 0 para desativar o som.</span>
+                </label>
+
+                <div className="flex flex-col gap-1">
+                  <span className="label invisible">Ações</span>
+                  <div className="flex flex-wrap gap-2">
+                    {!running ? (
+                      <button
+                        type="button"
+                        className="btn-primary h-12 min-w-[132px] justify-center px-5"
+                        onClick={() => void handleStart()}
+                      >
+                        Iniciar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="button h-12 min-w-[132px] justify-center px-5"
+                        onClick={handlePause}
+                      >
+                        Pausar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="button h-12 min-w-[132px] justify-center px-5"
+                      onClick={handleResetTimer}
+                      disabled={running}
+                    >
+                      Resetar sessao
+                    </button>
+                    {isSprintMode && !sprintFinished && sprintHasStarted ? (
+                      <button
+                        type="button"
+                        className="btn-primary h-12 min-w-[160px] justify-center px-5"
+                        onClick={handleFinishSprintEarly}
+                      >
+                        Concluir agora
+                      </button>
+                    ) : null}
                   </div>
                 </div>
-                <div className="text-sm text-muted">
-                  Progresso da meta: {sprintGoalProgress}%{sprintGoalReached ? " (atingida)" : ""}
+              </div>
+
+              {isSprintMode ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="kpi">
+                      <div className="label">Tempo restante</div>
+                      <div className="value">
+                        {formatDuration(sprintRemainingSeconds ?? sprintDurationSeconds)}
+                      </div>
+                      <div className="hint">
+                        {running
+                          ? "Contagem regressiva da sprint"
+                          : "Sprint configurada no editor"}
+                      </div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Palavras na sessao</div>
+                      <div className="value">{fmt(sprintSessionWords)}</div>
+                      <div className="hint">Acumuladas desde o inicio da sprint</div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Meta da sprint</div>
+                      <div className="value">{fmt(sprintGoal)}</div>
+                      <div className="hint">
+                        {sprintGoal > 0
+                          ? `${fmt(Math.max(0, sprintGoal - sprintSessionWords))} para concluir`
+                          : "Defina uma meta para acompanhar a sessao"}
+                      </div>
+                    </div>
+                    <div className="kpi">
+                      <div className="label">Pronto para salvar</div>
+                      <div className="value">{fmt(sprintSessionWords)}</div>
+                      <div className="hint">
+                        {sprintSavedToProject
+                          ? "Sessao ja registrada no projeto"
+                          : "Sessao pronta para registro"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="label">Status da sprint</div>
+                        <div className="mt-1 text-lg font-semibold text-[#111827]">
+                          {sprintStatusLabel}
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted">
+                        Progresso da meta: {sprintGoalProgress}%
+                        {sprintGoalReached ? " (atingida)" : ""}
+                      </div>
+                      <div className="text-sm text-muted">
+                        {sprintSavedToProject
+                          ? "Sessao ja salva no projeto"
+                          : cueIntervalMinutes > 0
+                            ? `Sinal a cada ${cueIntervalMinutes} min`
+                            : "Sem alerta sonoro"}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="kpi">
+                    <div className="label">Tempo decorrido</div>
+                    <div className="value">{formatDuration(elapsedSeconds)}</div>
+                    <div className="hint">Cronômetro contínuo</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Palavras no texto</div>
+                    <div className="value">{fmt(wordCount)}</div>
+                    <div className="hint">Contagem atual</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Pronto para salvar</div>
+                    <div className="value">{fmt(unsavedWords)}</div>
+                    <div className="hint">Delta ainda não registrado</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="label">Próximo sinal</div>
+                    <div className="value">
+                      {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
+                    </div>
+                    <div className="hint">
+                      {cueIntervalMinutes > 0
+                        ? `A cada ${cueIntervalMinutes} min`
+                        : "Sem alerta sonoro"}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-muted">
-                  {sprintSavedToProject
-                    ? "Sessao ja salva no projeto"
-                    : cueIntervalMinutes > 0
-                      ? `Sinal a cada ${cueIntervalMinutes} min`
-                      : "Sem alerta sonoro"}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="kpi">
-              <div className="label">Tempo decorrido</div>
-              <div className="value">{formatDuration(elapsedSeconds)}</div>
-              <div className="hint">Cronômetro contínuo</div>
-            </div>
-            <div className="kpi">
-              <div className="label">Palavras no texto</div>
-              <div className="value">{fmt(wordCount)}</div>
-              <div className="hint">Contagem atual</div>
-            </div>
-            <div className="kpi">
-              <div className="label">Pronto para salvar</div>
-              <div className="value">{fmt(unsavedWords)}</div>
-              <div className="hint">Delta ainda não registrado</div>
-            </div>
-            <div className="kpi">
-              <div className="label">Próximo sinal</div>
-              <div className="value">
-                {nextCueInSeconds === null ? "Desativado" : formatDuration(nextCueInSeconds)}
-              </div>
-              <div className="hint">
-                {cueIntervalMinutes > 0
-                  ? `A cada ${cueIntervalMinutes} min`
-                  : "Sem alerta sonoro"}
-              </div>
+              )}
+
+              <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
             </div>
           </div>
-        )}
-
-        <DraftHistoryPanel versions={draftHistory} onRestore={handleRestoreVersion} />
+        </div>
       </section>
 
       <section className="panel space-y-4">
