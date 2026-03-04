@@ -1542,44 +1542,42 @@ export default function FocusEditor() {
           <p className="text-muted mt-2">
             Escreva no modo livre ou ative uma sprint sem sair do editor.
           </p>
-          <div className="mt-4 overflow-hidden rounded-[28px] border border-black/10 bg-white/70 shadow-sm">
-            <div className="border-b border-black/10 bg-[#d7d4cf] px-3 pt-3">
-              <div className="inline-flex items-end gap-1">
-                <button
-                  type="button"
-                  className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
-                    !isSprintMode
-                      ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
-                      : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
-                  }`}
-                  onClick={() => handleModeChange("free")}
-                  disabled={running}
-                  aria-pressed={!isSprintMode}
-                >
-                  Modo livre
-                </button>
-                <button
-                  type="button"
-                  className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
-                    isSprintMode
-                      ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
-                      : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
-                  }`}
-                  onClick={() => handleModeChange("sprint")}
-                  disabled={running}
-                  aria-pressed={isSprintMode}
-                >
-                  Modo sprint
-                </button>
-              </div>
+          <div className="mt-4">
+            <div className="relative z-10 inline-flex items-end gap-1 rounded-t-xl border border-b-0 border-black/10 bg-[#d7d4cf] px-2 pt-2 shadow-sm">
+              <button
+                type="button"
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  !isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("free")}
+                disabled={running}
+                aria-pressed={!isSprintMode}
+              >
+                Modo livre
+              </button>
+              <button
+                type="button"
+                className={`relative rounded-t-lg border px-5 py-2.5 text-sm font-medium transition ${
+                  isSprintMode
+                    ? "top-px border-black/15 border-b-white bg-white text-ink shadow-sm"
+                    : "border-black/10 border-b-transparent bg-[#ece8e1] text-[#4b5563] hover:bg-[#f6f3ed]"
+                }`}
+                onClick={() => handleModeChange("sprint")}
+                disabled={running}
+                aria-pressed={isSprintMode}
+              >
+                Modo sprint
+              </button>
             </div>
-            <div className="space-y-4 px-4 py-4">
+            <div className="-mt-px rounded-b-2xl rounded-tr-2xl border border-black/10 bg-white/70 px-4 py-4 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-                <span>Rascunho do editor separado por projeto.</span>
+                <span>Rascunho local separado por projeto.</span>
                 <span>
                   {lastAutosavedAt
                     ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
-                    : "Nenhum rascunho salvo neste projeto."}
+                    : "Nenhum rascunho salvo localmente neste projeto."}
                 </span>
               </div>
 
