@@ -190,7 +190,8 @@ function createDraftPayload(
   projectId,
   projectLabel,
   html,
-  updatedAt = new Date().toISOString()
+  updatedAt = new Date().toISOString(),
+  options = {}
 ) {
   const normalizedHtml = normalizeEditorHtml(html);
   const plain = htmlToPlainText(normalizedHtml);
@@ -202,6 +203,7 @@ function createDraftPayload(
     updatedAt,
     wordCount: countWords(plain),
     previewText: plain.slice(0, 180),
+    lastKnownRemoteUpdatedAtUtc: options.lastKnownRemoteUpdatedAtUtc ?? null,
   };
 }
 
@@ -224,7 +226,26 @@ function mapRemoteDraftToLocal(projects, projectId, draft) {
     projectId,
     resolveProjectLabel(projects, projectId),
     htmlContent,
-    updatedAt || new Date().toISOString()
+    updatedAt || new Date().toISOString(),
+    { lastKnownRemoteUpdatedAtUtc: updatedAt || null }
+  );
+}
+
+function areDraftContentsEqual(leftHtml, rightHtml) {
+  return normalizeEditorHtml(leftHtml) === normalizeEditorHtml(rightHtml);
+}
+
+function extractConflictCurrentDraft(error) {
+  if (error?.response?.status !== 409) return null;
+  const payload = error?.response?.data;
+  if (!payload || typeof payload !== "object") return null;
+
+  return (
+    payload.currentDraft ??
+    payload.CurrentDraft ??
+    payload?.extensions?.currentDraft ??
+    payload?.Extensions?.CurrentDraft ??
+    null
   );
 }
 
@@ -469,6 +490,75 @@ function DraftRecoveryModal({ draft, onRestore, onDiscard, onClose }) {
   );
 }
 
+function DraftConflictModal({
+  conflict,
+  resolving,
+  onUseLocal,
+  onUseRemote,
+}) {
+  if (!conflict) return null;
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/45 p-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold">Conflito de rascunho detectado</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Detectamos versões diferentes para{" "}
+            <span className="font-medium text-[#111827]">{conflict.projectLabel}</span>.
+            Escolha qual versão deve continuar.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-black/10 bg-[#f8f5ef] p-4 text-sm text-gray-700">
+            <div className="font-semibold text-[#111827]">Sua versão local</div>
+            <div className="mt-2">
+              Último autosave: {formatDraftTimestamp(conflict.localDraft?.updatedAt)}
+            </div>
+            <div>Palavras: {fmt(conflict.localDraft?.wordCount)}</div>
+            {conflict.localDraft?.previewText ? (
+              <p className="mt-2 line-clamp-3 text-gray-600">
+                {conflict.localDraft.previewText}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-black/10 bg-[#f8f5ef] p-4 text-sm text-gray-700">
+            <div className="font-semibold text-[#111827]">Versão remota</div>
+            <div className="mt-2">
+              Atualizada em: {formatDraftTimestamp(conflict.remoteDraft.updatedAt)}
+            </div>
+            <div>Palavras: {fmt(conflict.remoteDraft.wordCount)}</div>
+            {conflict.remoteDraft.previewText ? (
+              <p className="mt-2 line-clamp-3 text-gray-600">{conflict.remoteDraft.previewText}</p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className="button"
+            onClick={onUseRemote}
+            disabled={resolving}
+          >
+            Usar versão remota
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={onUseLocal}
+            disabled={resolving}
+          >
+            {resolving ? "Sincronizando..." : "Manter minha versão"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DraftHistoryPanel({ versions, onRestore }) {
   if (!versions.length) return null;
 
@@ -533,6 +623,8 @@ export default function FocusEditor() {
   const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
   const [lastAutosavedAt, setLastAutosavedAt] = useState(null);
   const [draftPrompt, setDraftPrompt] = useState(null);
+  const [draftConflictPrompt, setDraftConflictPrompt] = useState(null);
+  const [resolvingDraftConflict, setResolvingDraftConflict] = useState(false);
   const [draftHistory, setDraftHistory] = useState([]);
   const [feedback, setFeedback] = useState({
     open: false,
@@ -609,6 +701,40 @@ export default function FocusEditor() {
     });
   };
 
+  const openDraftConflict = useCallback(
+    (projectId, localDraft, remoteDraft, source = "autosave") => {
+      const scopeKey = getDraftScopeKey(projectId);
+      autosaveSuspendedRef.current = true;
+      window.clearTimeout(autosaveTimeoutRef.current);
+
+      const localSnapshot = localDraft?.contentHtml
+        ? {
+            ...localDraft,
+            lastKnownRemoteUpdatedAtUtc:
+              localDraft.lastKnownRemoteUpdatedAtUtc ??
+              remoteDraft.lastKnownRemoteUpdatedAtUtc ??
+              null,
+          }
+        : null;
+
+      setDraftConflictPrompt({
+        source,
+        projectId,
+        scopeKey,
+        projectLabel: resolveProjectLabel(projects, projectId),
+        localDraft: localSnapshot,
+        remoteDraft,
+      });
+
+      setResolvingDraftConflict(false);
+      setDraftPrompt(null);
+      if (currentScopeRef.current === scopeKey) {
+        setDraftHistory(readStoredDraftVersions(projectId));
+      }
+    },
+    [projects]
+  );
+
   const persistDraft = useCallback(
     (projectId, html) => {
       if (typeof window === "undefined") return;
@@ -628,13 +754,18 @@ export default function FocusEditor() {
       const payload = createDraftPayload(
         projectId,
         resolveProjectLabel(projects, projectId),
-        normalizedHtml
+        normalizedHtml,
+        new Date().toISOString(),
+        {
+          lastKnownRemoteUpdatedAtUtc:
+            currentStoredDraft?.lastKnownRemoteUpdatedAtUtc ?? null,
+        }
       );
       let nextHistory = readStoredDraftVersions(projectId);
 
       if (
         currentStoredDraft?.contentHtml &&
-        currentStoredDraft.contentHtml !== payload.contentHtml
+        !areDraftContentsEqual(currentStoredDraft.contentHtml, payload.contentHtml)
       ) {
         nextHistory = appendStoredDraftVersion(projectId, currentStoredDraft);
       }
@@ -655,7 +786,11 @@ export default function FocusEditor() {
 
       void (async () => {
         try {
-          const remoteDraft = await saveProjectDraft(projectId, normalizedHtml);
+          const remoteDraft = await saveProjectDraft(
+            projectId,
+            normalizedHtml,
+            payload.lastKnownRemoteUpdatedAtUtc
+          );
 
           if (remoteSaveSequenceRef.current[scopeKey] !== nextSequence) {
             return;
@@ -669,11 +804,32 @@ export default function FocusEditor() {
             setDraftHistory(readStoredDraftVersions(projectId));
           }
         } catch (error) {
+          if (remoteSaveSequenceRef.current[scopeKey] !== nextSequence) {
+            return;
+          }
+
+          const conflictRemoteDraft = extractConflictCurrentDraft(error);
+          if (conflictRemoteDraft) {
+            const remotePayload = mapRemoteDraftToLocal(
+              projects,
+              projectId,
+              conflictRemoteDraft
+            );
+
+            if (!areDraftContentsEqual(payload.contentHtml, remotePayload.contentHtml)) {
+              appendStoredDraftVersion(projectId, payload, { force: true });
+              appendStoredDraftVersion(projectId, remotePayload, { force: true });
+            }
+
+            openDraftConflict(projectId, payload, remotePayload, "autosave");
+            return;
+          }
+
           console.error("Erro ao sincronizar rascunho remoto:", error);
         }
       })();
     },
-    [projects]
+    [openDraftConflict, projects]
   );
 
   const initializeDraftForProject = useCallback(
@@ -688,6 +844,8 @@ export default function FocusEditor() {
 
       setContentHtml("");
       setDraftHistory(storedHistory);
+      setDraftConflictPrompt(null);
+      setResolvingDraftConflict(false);
       if (editorRef.current) {
         editorRef.current.innerHTML = "";
       }
@@ -711,6 +869,42 @@ export default function FocusEditor() {
 
         if (remoteDraft) {
           const remotePayload = mapRemoteDraftToLocal(projects, projectId, remoteDraft);
+
+          if (storedDraft?.contentHtml) {
+            const syncedStoredDraft = {
+              ...storedDraft,
+              lastKnownRemoteUpdatedAtUtc:
+                storedDraft.lastKnownRemoteUpdatedAtUtc ??
+                remotePayload.lastKnownRemoteUpdatedAtUtc ??
+                null,
+            };
+
+            if (
+              !areDraftContentsEqual(
+                syncedStoredDraft.contentHtml,
+                remotePayload.contentHtml
+              )
+            ) {
+              appendStoredDraftVersion(projectId, syncedStoredDraft, { force: true });
+              appendStoredDraftVersion(projectId, remotePayload, { force: true });
+              openDraftConflict(projectId, syncedStoredDraft, remotePayload, "load");
+              return;
+            }
+
+            const storedTime = Date.parse(syncedStoredDraft.updatedAt ?? "");
+            const remoteTime = Date.parse(remotePayload.updatedAt ?? "");
+            const preferredDraft =
+              Number.isFinite(storedTime) &&
+              Number.isFinite(remoteTime) &&
+              storedTime > remoteTime
+                ? syncedStoredDraft
+                : remotePayload;
+            setStoredDraft(projectId, preferredDraft);
+            setDraftPrompt(preferredDraft);
+            setLastAutosavedAt(preferredDraft.updatedAt ?? null);
+            return;
+          }
+
           setStoredDraft(projectId, remotePayload);
           setDraftPrompt(remotePayload);
           setLastAutosavedAt(remotePayload.updatedAt ?? null);
@@ -732,7 +926,7 @@ export default function FocusEditor() {
       setLastAutosavedAt(null);
       autosaveSuspendedRef.current = false;
     },
-    [projects]
+    [openDraftConflict, projects]
   );
 
   const refreshToolbarState = useCallback(() => {
@@ -1052,6 +1246,8 @@ export default function FocusEditor() {
     setContentHtml("");
     setLastAutosavedAt(null);
     setDraftPrompt(null);
+    setDraftConflictPrompt(null);
+    setResolvingDraftConflict(false);
     autosaveSuspendedRef.current = false;
     setLastSavedWords(0);
     setLastSavedElapsedSeconds(0);
@@ -1073,6 +1269,7 @@ export default function FocusEditor() {
   const handleRestoreDraft = () => {
     if (!draftPrompt?.contentHtml) {
       setDraftPrompt(null);
+      setDraftConflictPrompt(null);
       autosaveSuspendedRef.current = false;
       return;
     }
@@ -1080,6 +1277,7 @@ export default function FocusEditor() {
     setContentHtml(normalizeEditorHtml(draftPrompt.contentHtml));
     setLastAutosavedAt(draftPrompt.updatedAt ?? null);
     setDraftPrompt(null);
+    setDraftConflictPrompt(null);
     autosaveSuspendedRef.current = false;
   };
 
@@ -1088,6 +1286,8 @@ export default function FocusEditor() {
     setContentHtml("");
     setLastAutosavedAt(null);
     setDraftPrompt(null);
+    setDraftConflictPrompt(null);
+    setResolvingDraftConflict(false);
     setDraftHistory(readStoredDraftVersions(selectedProjectId));
     autosaveSuspendedRef.current = false;
     if (editorRef.current) {
@@ -1099,6 +1299,84 @@ export default function FocusEditor() {
       void saveProjectDraft(selectedProjectId, "").catch((error) => {
         console.error("Erro ao descartar rascunho remoto:", error);
       });
+    }
+  };
+
+  const handleUseRemoteDraft = () => {
+    if (!draftConflictPrompt) return;
+
+    const { projectId, scopeKey, localDraft, remoteDraft } = draftConflictPrompt;
+
+    if (
+      localDraft?.contentHtml &&
+      !areDraftContentsEqual(localDraft.contentHtml, remoteDraft.contentHtml)
+    ) {
+      appendStoredDraftVersion(projectId, localDraft, { force: true });
+    }
+
+    appendStoredDraftVersion(projectId, remoteDraft, { force: true });
+    setStoredDraft(projectId, remoteDraft);
+
+    if (currentScopeRef.current === scopeKey) {
+      setContentHtml(normalizeEditorHtml(remoteDraft.contentHtml));
+      setLastAutosavedAt(remoteDraft.updatedAt ?? null);
+      setDraftHistory(readStoredDraftVersions(projectId));
+    }
+
+    setDraftConflictPrompt(null);
+    setResolvingDraftConflict(false);
+    autosaveSuspendedRef.current = false;
+
+    openFeedback(
+      "success",
+      "Rascunho remoto aplicado",
+      "A versão remota foi aplicada e o histórico local foi preservado."
+    );
+  };
+
+  const handleKeepLocalDraft = async () => {
+    if (!draftConflictPrompt || !draftConflictPrompt.localDraft?.contentHtml) {
+      setDraftConflictPrompt(null);
+      autosaveSuspendedRef.current = false;
+      return;
+    }
+
+    const { projectId, scopeKey, localDraft, remoteDraft } = draftConflictPrompt;
+    setResolvingDraftConflict(true);
+
+    try {
+      const remoteSavedDraft = await saveProjectDraft(
+        projectId,
+        localDraft.contentHtml,
+        remoteDraft.lastKnownRemoteUpdatedAtUtc
+      );
+      const syncedDraft = mapRemoteDraftToLocal(projects, projectId, remoteSavedDraft);
+
+      appendStoredDraftVersion(projectId, remoteDraft, { force: true });
+      setStoredDraft(projectId, syncedDraft);
+
+      if (currentScopeRef.current === scopeKey) {
+        setContentHtml(normalizeEditorHtml(syncedDraft.contentHtml));
+        setLastAutosavedAt(syncedDraft.updatedAt ?? null);
+        setDraftHistory(readStoredDraftVersions(projectId));
+      }
+
+      setDraftConflictPrompt(null);
+      autosaveSuspendedRef.current = false;
+      openFeedback(
+        "success",
+        "Rascunho local mantido",
+        "Sua versão local foi sincronizada com sucesso no servidor."
+      );
+    } catch (error) {
+      console.error("Erro ao manter rascunho local:", error);
+      openFeedback(
+        "error",
+        "Conflito não resolvido",
+        "Não foi possível sincronizar sua versão local. Tente novamente."
+      );
+    } finally {
+      setResolvingDraftConflict(false);
     }
   };
 
@@ -1114,7 +1392,12 @@ export default function FocusEditor() {
     const restoredPayload = createDraftPayload(
       selectedProjectId,
       selectedProjectName,
-      version.contentHtml
+      version.contentHtml,
+      new Date().toISOString(),
+      {
+        lastKnownRemoteUpdatedAtUtc:
+          currentStoredDraft?.lastKnownRemoteUpdatedAtUtc ?? null,
+      }
     );
 
     setStoredDraft(selectedProjectId, restoredPayload);
@@ -1122,6 +1405,7 @@ export default function FocusEditor() {
     setContentHtml(normalizeEditorHtml(version.contentHtml));
     setLastAutosavedAt(restoredPayload.updatedAt);
     setDraftPrompt(null);
+    setDraftConflictPrompt(null);
     autosaveSuspendedRef.current = false;
     if (editorRef.current) {
       editorRef.current.focus();
@@ -1659,6 +1943,12 @@ export default function FocusEditor() {
         onRestore={handleRestoreDraft}
         onDiscard={handleDiscardDraft}
         onClose={handleDiscardDraft}
+      />
+      <DraftConflictModal
+        conflict={draftConflictPrompt}
+        resolving={resolvingDraftConflict}
+        onUseLocal={() => void handleKeepLocalDraft()}
+        onUseRemote={handleUseRemoteDraft}
       />
     </main>
   );

@@ -27,8 +27,17 @@ export const getProjectDraft = async (projectId) => {
   return String(htmlContent).trim() ? response.data : null;
 };
 
-export const saveProjectDraft = async (projectId, htmlContent) => {
-  const { data } = await api.put(`/projects/${projectId}/draft`, { htmlContent });
+export const saveProjectDraft = async (
+  projectId,
+  htmlContent,
+  lastKnownUpdatedAtUtc = null
+) => {
+  const payload = { htmlContent };
+  if (lastKnownUpdatedAtUtc) {
+    payload.lastKnownUpdatedAtUtc = lastKnownUpdatedAtUtc;
+  }
+
+  const { data } = await api.put(`/projects/${projectId}/draft`, payload);
   return data;
 };
 
