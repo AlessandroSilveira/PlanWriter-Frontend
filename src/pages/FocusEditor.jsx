@@ -1194,7 +1194,7 @@ export default function FocusEditor() {
                 Modo sprint
               </button>
             </div>
-            <div className="-mt-px rounded-b-2xl rounded-tr-2xl border border-black/10 bg-white/70 px-4 py-4 shadow-sm space-y-4">
+            <div className="-mt-px rounded-r-[22px] rounded-b-[22px] border border-black/10 bg-white/70 px-4 py-4 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
                 <span>Rascunho local separado por projeto.</span>
                 <span>
