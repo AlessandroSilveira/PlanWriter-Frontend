@@ -29,7 +29,12 @@ import {
   Undo2,
   Unlink2,
 } from "lucide-react";
-import { addProgress, getProjects } from "../api/projects";
+import {
+  addProgress,
+  getProjectDraft,
+  getProjects,
+  saveProjectDraft,
+} from "../api/projects";
 import FeedbackModal from "../components/FeedbackModal.jsx";
 import {
   exportHtmlAsDoc,
@@ -198,6 +203,29 @@ function createDraftPayload(
     wordCount: countWords(plain),
     previewText: plain.slice(0, 180),
   };
+}
+
+function resolveProjectLabel(projects, projectId) {
+  return (
+    projects.find((project) => String(project.id ?? project.projectId) === String(projectId))
+      ?.title ??
+    projects.find((project) => String(project.id ?? project.projectId) === String(projectId))
+      ?.name ??
+    "Sem projeto"
+  );
+}
+
+function mapRemoteDraftToLocal(projects, projectId, draft) {
+  const htmlContent = draft?.htmlContent ?? draft?.HtmlContent ?? "";
+  const updatedAt =
+    draft?.updatedAtUtc ?? draft?.UpdatedAtUtc ?? draft?.updatedAt ?? draft?.UpdatedAt;
+
+  return createDraftPayload(
+    projectId,
+    resolveProjectLabel(projects, projectId),
+    htmlContent,
+    updatedAt || new Date().toISOString()
+  );
 }
 
 function appendStoredDraftVersion(projectId, snapshot, options = {}) {
@@ -522,6 +550,7 @@ export default function FocusEditor() {
   const autosaveTimeoutRef = useRef(null);
   const autosaveSuspendedRef = useRef(true);
   const currentScopeRef = useRef(null);
+  const remoteSaveSequenceRef = useRef({});
 
   const plainText = useMemo(() => htmlToPlainText(contentHtml), [contentHtml]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
@@ -596,16 +625,11 @@ export default function FocusEditor() {
         return;
       }
 
-      const projectLabel =
-        projects.find(
-          (project) => String(project.id ?? project.projectId) === String(projectId)
-        )?.title ??
-        projects.find(
-          (project) => String(project.id ?? project.projectId) === String(projectId)
-        )?.name ??
-        "Sem projeto";
-
-      const payload = createDraftPayload(projectId, projectLabel, normalizedHtml);
+      const payload = createDraftPayload(
+        projectId,
+        resolveProjectLabel(projects, projectId),
+        normalizedHtml
+      );
       let nextHistory = readStoredDraftVersions(projectId);
 
       if (
@@ -621,25 +645,82 @@ export default function FocusEditor() {
         setLastAutosavedAt(payload.updatedAt);
         setDraftHistory(nextHistory);
       }
+
+      if (!projectId) {
+        return;
+      }
+
+      const nextSequence = (remoteSaveSequenceRef.current[scopeKey] ?? 0) + 1;
+      remoteSaveSequenceRef.current[scopeKey] = nextSequence;
+
+      void (async () => {
+        try {
+          const remoteDraft = await saveProjectDraft(projectId, normalizedHtml);
+
+          if (remoteSaveSequenceRef.current[scopeKey] !== nextSequence) {
+            return;
+          }
+
+          const remotePayload = mapRemoteDraftToLocal(projects, projectId, remoteDraft);
+          setStoredDraft(projectId, remotePayload);
+
+          if (currentScopeRef.current === scopeKey) {
+            setLastAutosavedAt(remotePayload.updatedAt);
+            setDraftHistory(readStoredDraftVersions(projectId));
+          }
+        } catch (error) {
+          console.error("Erro ao sincronizar rascunho remoto:", error);
+        }
+      })();
     },
     [projects]
   );
 
   const initializeDraftForProject = useCallback(
-    (projectId) => {
+    async (projectId) => {
       const scopeKey = getDraftScopeKey(projectId);
       currentScopeRef.current = scopeKey;
       autosaveSuspendedRef.current = true;
       window.clearTimeout(autosaveTimeoutRef.current);
 
-      const storedDraft = readStoredDraft(projectId);
       const storedHistory = readStoredDraftVersions(projectId);
+      const storedDraft = readStoredDraft(projectId);
 
       setContentHtml("");
       setDraftHistory(storedHistory);
       if (editorRef.current) {
         editorRef.current.innerHTML = "";
       }
+
+      if (!projectId) {
+        if (storedDraft?.contentHtml) {
+          setDraftPrompt(storedDraft);
+          setLastAutosavedAt(storedDraft.updatedAt ?? null);
+          return;
+        }
+
+        setDraftPrompt(null);
+        setLastAutosavedAt(null);
+        autosaveSuspendedRef.current = false;
+        return;
+      }
+
+      try {
+        const remoteDraft = await getProjectDraft(projectId);
+        if (currentScopeRef.current !== scopeKey) return;
+
+        if (remoteDraft) {
+          const remotePayload = mapRemoteDraftToLocal(projects, projectId, remoteDraft);
+          setStoredDraft(projectId, remotePayload);
+          setDraftPrompt(remotePayload);
+          setLastAutosavedAt(remotePayload.updatedAt ?? null);
+          return;
+        }
+      } catch (error) {
+        console.error("Erro ao carregar rascunho remoto:", error);
+      }
+
+      if (currentScopeRef.current !== scopeKey) return;
 
       if (storedDraft?.contentHtml) {
         setDraftPrompt(storedDraft);
@@ -651,7 +732,7 @@ export default function FocusEditor() {
       setLastAutosavedAt(null);
       autosaveSuspendedRef.current = false;
     },
-    []
+    [projects]
   );
 
   const refreshToolbarState = useCallback(() => {
@@ -981,6 +1062,12 @@ export default function FocusEditor() {
       editorRef.current.innerHTML = "";
       editorRef.current.focus();
     }
+
+    if (selectedProjectId) {
+      void saveProjectDraft(selectedProjectId, "").catch((error) => {
+        console.error("Erro ao limpar rascunho remoto:", error);
+      });
+    }
   };
 
   const handleRestoreDraft = () => {
@@ -1006,6 +1093,12 @@ export default function FocusEditor() {
     if (editorRef.current) {
       editorRef.current.innerHTML = "";
       editorRef.current.focus();
+    }
+
+    if (selectedProjectId) {
+      void saveProjectDraft(selectedProjectId, "").catch((error) => {
+        console.error("Erro ao descartar rascunho remoto:", error);
+      });
     }
   };
 
@@ -1198,11 +1291,11 @@ export default function FocusEditor() {
             </div>
             <div className="space-y-4 px-4 py-4">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-                <span>Rascunho local separado por projeto.</span>
+                <span>Rascunho do editor separado por projeto.</span>
                 <span>
                   {lastAutosavedAt
                     ? `Último autosave: ${formatDraftTimestamp(lastAutosavedAt)}`
-                    : "Nenhum rascunho salvo localmente neste projeto."}
+                    : "Nenhum rascunho salvo neste projeto."}
                 </span>
               </div>
 
