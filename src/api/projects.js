@@ -14,6 +14,24 @@ export const getProject = async (id) => {
   return data;
 };
 
+export const getProjectDraft = async (projectId) => {
+  const response = await api.get(`/projects/${projectId}/draft`, {
+    validateStatus: (status) => status === 204 || (status >= 200 && status < 300),
+  });
+
+  if (response.status === 204 || !response.data) {
+    return null;
+  }
+
+  const htmlContent = response.data.htmlContent ?? response.data.HtmlContent ?? "";
+  return String(htmlContent).trim() ? response.data : null;
+};
+
+export const saveProjectDraft = async (projectId, htmlContent) => {
+  const { data } = await api.put(`/projects/${projectId}/draft`, { htmlContent });
+  return data;
+};
+
 // =====================
 // Histórico (progresso)
 // BACKEND: GET /projects/{id}/history
