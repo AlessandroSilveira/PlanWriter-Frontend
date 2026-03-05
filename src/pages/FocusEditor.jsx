@@ -254,6 +254,10 @@ function extractConflictCurrentDraft(error) {
   );
 }
 
+function isDraftConflictError(error) {
+  return error?.response?.status === 409;
+}
+
 function appendStoredDraftVersion(projectId, snapshot, options = {}) {
   if (!snapshot?.contentHtml) return readStoredDraftVersions(projectId);
 
@@ -821,12 +825,22 @@ export default function FocusEditor() {
               conflictRemoteDraft
             );
 
-            if (!areDraftContentsEqual(payload.contentHtml, remotePayload.contentHtml)) {
-              appendStoredDraftVersion(projectId, payload, { force: true });
-              appendStoredDraftVersion(projectId, remotePayload, { force: true });
+            if (areDraftContentsEqual(payload.contentHtml, remotePayload.contentHtml)) {
+              setStoredDraft(projectId, remotePayload);
+              if (currentScopeRef.current === scopeKey) {
+                setLastAutosavedAt(remotePayload.updatedAt ?? null);
+                setDraftHistory(readStoredDraftVersions(projectId));
+              }
+              return;
             }
 
+            appendStoredDraftVersion(projectId, payload, { force: true });
+            appendStoredDraftVersion(projectId, remotePayload, { force: true });
             openDraftConflict(projectId, payload, remotePayload, "autosave");
+            return;
+          }
+
+          if (isDraftConflictError(error)) {
             return;
           }
 
@@ -1351,41 +1365,38 @@ export default function FocusEditor() {
 
     try {
       const trySaveKeepingLocal = async () => {
-        const expectedRemoteUpdatedAtUtc =
+        let expectedRemoteUpdatedAtUtc =
           remoteDraft.lastKnownRemoteUpdatedAtUtc ?? remoteDraft.updatedAt ?? null;
 
-        try {
-          return await saveProjectDraft(
-            projectId,
-            localDraft.contentHtml,
-            expectedRemoteUpdatedAtUtc
-          );
-        } catch (firstError) {
-          const latestConflictDraft = extractConflictCurrentDraft(firstError);
-          if (!latestConflictDraft) throw firstError;
-
-          const latestRemotePayload = mapRemoteDraftToLocal(
-            projects,
-            projectId,
-            latestConflictDraft
-          );
-
+        for (let attempt = 0; attempt < 3; attempt += 1) {
           try {
             return await saveProjectDraft(
               projectId,
               localDraft.contentHtml,
-              latestRemotePayload.lastKnownRemoteUpdatedAtUtc ??
-                latestRemotePayload.updatedAt ??
-                null
+              expectedRemoteUpdatedAtUtc
             );
-          } catch (secondError) {
-            const secondConflictDraft = extractConflictCurrentDraft(secondError);
-            if (!secondConflictDraft) throw secondError;
+          } catch (error) {
+            if (!isDraftConflictError(error)) throw error;
 
-            // User explicitly chose to keep local content, so final attempt ignores the precondition.
-            return await saveProjectDraft(projectId, localDraft.contentHtml, null);
+            const latestConflictDraft = extractConflictCurrentDraft(error);
+            if (!latestConflictDraft) {
+              return await saveProjectDraft(projectId, localDraft.contentHtml, null);
+            }
+
+            const latestRemotePayload = mapRemoteDraftToLocal(
+              projects,
+              projectId,
+              latestConflictDraft
+            );
+            expectedRemoteUpdatedAtUtc =
+              latestRemotePayload.lastKnownRemoteUpdatedAtUtc ??
+              latestRemotePayload.updatedAt ??
+              null;
           }
         }
+
+        // User explicitly chose to keep local content.
+        return await saveProjectDraft(projectId, localDraft.contentHtml, null);
       };
 
       const remoteSavedDraft = await trySaveKeepingLocal();
