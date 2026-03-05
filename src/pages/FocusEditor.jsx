@@ -97,6 +97,11 @@ function pad2(value) {
   return String(value).padStart(2, "0");
 }
 
+function getLocalProgressDateTime() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}T00:00:00`;
+}
+
 function getDraftScopeKey(projectId) {
   const value = String(projectId ?? "").trim();
   return value || DEFAULT_DRAFT_SCOPE;
@@ -1345,11 +1350,45 @@ export default function FocusEditor() {
     setResolvingDraftConflict(true);
 
     try {
-      const remoteSavedDraft = await saveProjectDraft(
-        projectId,
-        localDraft.contentHtml,
-        remoteDraft.lastKnownRemoteUpdatedAtUtc
-      );
+      const trySaveKeepingLocal = async () => {
+        const expectedRemoteUpdatedAtUtc =
+          remoteDraft.lastKnownRemoteUpdatedAtUtc ?? remoteDraft.updatedAt ?? null;
+
+        try {
+          return await saveProjectDraft(
+            projectId,
+            localDraft.contentHtml,
+            expectedRemoteUpdatedAtUtc
+          );
+        } catch (firstError) {
+          const latestConflictDraft = extractConflictCurrentDraft(firstError);
+          if (!latestConflictDraft) throw firstError;
+
+          const latestRemotePayload = mapRemoteDraftToLocal(
+            projects,
+            projectId,
+            latestConflictDraft
+          );
+
+          try {
+            return await saveProjectDraft(
+              projectId,
+              localDraft.contentHtml,
+              latestRemotePayload.lastKnownRemoteUpdatedAtUtc ??
+                latestRemotePayload.updatedAt ??
+                null
+            );
+          } catch (secondError) {
+            const secondConflictDraft = extractConflictCurrentDraft(secondError);
+            if (!secondConflictDraft) throw secondError;
+
+            // User explicitly chose to keep local content, so final attempt ignores the precondition.
+            return await saveProjectDraft(projectId, localDraft.contentHtml, null);
+          }
+        }
+      };
+
+      const remoteSavedDraft = await trySaveKeepingLocal();
       const syncedDraft = mapRemoteDraftToLocal(projects, projectId, remoteSavedDraft);
 
       appendStoredDraftVersion(projectId, remoteDraft, { force: true });
@@ -1369,7 +1408,6 @@ export default function FocusEditor() {
         "Sua versão local foi sincronizada com sucesso no servidor."
       );
     } catch (error) {
-      console.error("Erro ao manter rascunho local:", error);
       openFeedback(
         "error",
         "Conflito não resolvido",
@@ -1503,7 +1541,7 @@ export default function FocusEditor() {
       await addProgress(selectedProjectId, {
         wordsWritten: wordsToPersist,
         minutes: deltaMinutes > 0 ? deltaMinutes : undefined,
-        date: new Date().toISOString(),
+        date: getLocalProgressDateTime(),
         notes: isSprintMode
           ? "Registrado pelo editor em modo sprint."
           : "Registrado pelo editor de texto com temporizador.",
