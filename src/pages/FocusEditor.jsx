@@ -97,6 +97,11 @@ function pad2(value) {
   return String(value).padStart(2, "0");
 }
 
+function getLocalProgressDateTime() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}T00:00:00`;
+}
+
 function getDraftScopeKey(projectId) {
   const value = String(projectId ?? "").trim();
   return value || DEFAULT_DRAFT_SCOPE;
@@ -247,6 +252,10 @@ function extractConflictCurrentDraft(error) {
     payload?.Extensions?.CurrentDraft ??
     null
   );
+}
+
+function isDraftConflictError(error) {
+  return error?.response?.status === 409;
 }
 
 function appendStoredDraftVersion(projectId, snapshot, options = {}) {
@@ -816,12 +825,22 @@ export default function FocusEditor() {
               conflictRemoteDraft
             );
 
-            if (!areDraftContentsEqual(payload.contentHtml, remotePayload.contentHtml)) {
-              appendStoredDraftVersion(projectId, payload, { force: true });
-              appendStoredDraftVersion(projectId, remotePayload, { force: true });
+            if (areDraftContentsEqual(payload.contentHtml, remotePayload.contentHtml)) {
+              setStoredDraft(projectId, remotePayload);
+              if (currentScopeRef.current === scopeKey) {
+                setLastAutosavedAt(remotePayload.updatedAt ?? null);
+                setDraftHistory(readStoredDraftVersions(projectId));
+              }
+              return;
             }
 
+            appendStoredDraftVersion(projectId, payload, { force: true });
+            appendStoredDraftVersion(projectId, remotePayload, { force: true });
             openDraftConflict(projectId, payload, remotePayload, "autosave");
+            return;
+          }
+
+          if (isDraftConflictError(error)) {
             return;
           }
 
@@ -1345,11 +1364,42 @@ export default function FocusEditor() {
     setResolvingDraftConflict(true);
 
     try {
-      const remoteSavedDraft = await saveProjectDraft(
-        projectId,
-        localDraft.contentHtml,
-        remoteDraft.lastKnownRemoteUpdatedAtUtc
-      );
+      const trySaveKeepingLocal = async () => {
+        let expectedRemoteUpdatedAtUtc =
+          remoteDraft.lastKnownRemoteUpdatedAtUtc ?? remoteDraft.updatedAt ?? null;
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            return await saveProjectDraft(
+              projectId,
+              localDraft.contentHtml,
+              expectedRemoteUpdatedAtUtc
+            );
+          } catch (error) {
+            if (!isDraftConflictError(error)) throw error;
+
+            const latestConflictDraft = extractConflictCurrentDraft(error);
+            if (!latestConflictDraft) {
+              return await saveProjectDraft(projectId, localDraft.contentHtml, null);
+            }
+
+            const latestRemotePayload = mapRemoteDraftToLocal(
+              projects,
+              projectId,
+              latestConflictDraft
+            );
+            expectedRemoteUpdatedAtUtc =
+              latestRemotePayload.lastKnownRemoteUpdatedAtUtc ??
+              latestRemotePayload.updatedAt ??
+              null;
+          }
+        }
+
+        // User explicitly chose to keep local content.
+        return await saveProjectDraft(projectId, localDraft.contentHtml, null);
+      };
+
+      const remoteSavedDraft = await trySaveKeepingLocal();
       const syncedDraft = mapRemoteDraftToLocal(projects, projectId, remoteSavedDraft);
 
       appendStoredDraftVersion(projectId, remoteDraft, { force: true });
@@ -1369,7 +1419,6 @@ export default function FocusEditor() {
         "Sua versão local foi sincronizada com sucesso no servidor."
       );
     } catch (error) {
-      console.error("Erro ao manter rascunho local:", error);
       openFeedback(
         "error",
         "Conflito não resolvido",
@@ -1503,7 +1552,7 @@ export default function FocusEditor() {
       await addProgress(selectedProjectId, {
         wordsWritten: wordsToPersist,
         minutes: deltaMinutes > 0 ? deltaMinutes : undefined,
-        date: new Date().toISOString(),
+        date: getLocalProgressDateTime(),
         notes: isSprintMode
           ? "Registrado pelo editor em modo sprint."
           : "Registrado pelo editor de texto com temporizador.",
