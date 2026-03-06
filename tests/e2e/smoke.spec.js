@@ -240,7 +240,8 @@ test("login flow persists across reload", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await dismissGuidedOnboardingIfVisible(page);
-  await expect(page.getByText("Bem vindo de volta, Escritor.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Seus projetos/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Novo projeto/i })).toBeVisible();
 
   await page.reload();
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -255,7 +256,8 @@ test("dashboard can create a new project through the modal", async ({ page }) =>
 
   await page.goto("/dashboard");
   await dismissGuidedOnboardingIfVisible(page);
-  await expect(page.getByText("Bem vindo de volta, Escritor.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Seus projetos/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Novo projeto/i })).toBeVisible();
 
   await page.getByRole("button", { name: /Novo projeto/i }).click();
   await expect(page.getByRole("heading", { name: "Novo Projeto" })).toBeVisible();
