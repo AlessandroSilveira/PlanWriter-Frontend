@@ -209,6 +209,17 @@ export default function Dashboard() {
     })();
   }, [projects]);
 
+  useEffect(() => {
+    if (!onboardingChecked || loading) return;
+    if (projects.length > 0) {
+      if (onboardingOpen) setOnboardingOpen(false);
+      return;
+    }
+    if (!onboardingDismissed) {
+      setOnboardingOpen(true);
+    }
+  }, [loading, onboardingChecked, onboardingDismissed, onboardingOpen, projects.length]);
+
   if (loading) return <p>Carregando...</p>;
 
   /* ===================== PROJETO BASE ===================== */
@@ -249,17 +260,6 @@ export default function Dashboard() {
     100,
     Math.max(0, (cur / goalMath) * 100)
   );
-
-  useEffect(() => {
-    if (!onboardingChecked || loading) return;
-    if (projects.length > 0) {
-      if (onboardingOpen) setOnboardingOpen(false);
-      return;
-    }
-    if (!onboardingDismissed) {
-      setOnboardingOpen(true);
-    }
-  }, [loading, onboardingChecked, onboardingDismissed, onboardingOpen, projects.length]);
 
   /* ===================== DONUT ===================== */
   const Ring = ({ pct = 0, size = 120, stroke = 12, label = "concluído" }) => {
