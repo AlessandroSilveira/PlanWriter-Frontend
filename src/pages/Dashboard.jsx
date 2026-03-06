@@ -19,6 +19,8 @@ import RecentBadges from "../components/RecentBadges.jsx";
 import ProjectForm from "../components/ProjectForm.jsx";
 import { isOngoing, toYMDLocal } from "../utils/overviewAggregation";
 
+const ONBOARDING_DISMISSED_KEY = "planwriter:onboarding:guided:v1:dismissed";
+
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [stats, setStats] = useState(null);
@@ -39,6 +41,9 @@ export default function Dashboard() {
   const [activeEventIds, setActiveEventIds] = useState(new Set());
   const [eventsLoading, setEventsLoading] = useState(true);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   /* ===================== LOAD PROJETOS ===================== */
   const load = async () => {
@@ -73,6 +78,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    try {
+      setOnboardingDismissed(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1");
+    } catch {
+      setOnboardingDismissed(false);
+    } finally {
+      setOnboardingChecked(true);
+    }
   }, []);
 
   /* ===================== META DO MÊS ===================== */
@@ -204,8 +219,22 @@ export default function Dashboard() {
   const closeNewProjectModal = () => setNewProjectOpen(false);
   const handleProjectCreated = async () => {
     closeNewProjectModal();
+    dismissOnboarding(true);
     await load();
   };
+
+  const dismissOnboarding = (remember) => {
+    setOnboardingOpen(false);
+    if (remember) {
+      setOnboardingDismissed(true);
+      try {
+        localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+      } catch {
+        /* sem persistencia local */
+      }
+    }
+  };
+
   const activeProjects = projects.filter(isOngoing);
   const activeMyEvents = myEvents.filter((ev) =>
     activeEventIds.has(String(ev?.eventId ?? ev?.EventId ?? ev?.id ?? ev?.Id ?? "").toLowerCase())
@@ -220,6 +249,17 @@ export default function Dashboard() {
     100,
     Math.max(0, (cur / goalMath) * 100)
   );
+
+  useEffect(() => {
+    if (!onboardingChecked || loading) return;
+    if (projects.length > 0) {
+      if (onboardingOpen) setOnboardingOpen(false);
+      return;
+    }
+    if (!onboardingDismissed) {
+      setOnboardingOpen(true);
+    }
+  }, [loading, onboardingChecked, onboardingDismissed, onboardingOpen, projects.length]);
 
   /* ===================== DONUT ===================== */
   const Ring = ({ pct = 0, size = 120, stroke = 12, label = "concluído" }) => {
@@ -474,6 +514,77 @@ export default function Dashboard() {
               onCancel={closeNewProjectModal}
               showCancel
             />
+          </div>
+        </div>
+      )}
+
+      {onboardingOpen && !newProjectOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => dismissOnboarding(true)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#6b7280] font-semibold">Primeiros passos</p>
+                <h2 className="text-2xl font-bold mt-1">Onboarding guiado</h2>
+                <p className="text-sm text-[#6b7280] mt-2">
+                  Em 2 minutos você começa a escrever com o fluxo completo do PlanWriter.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button"
+                onClick={() => dismissOnboarding(true)}
+                aria-label="Fechar onboarding"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="rounded-xl border border-[#e5e7eb] p-4">
+                <p className="font-semibold">1. Crie seu primeiro projeto</p>
+                <p className="text-sm text-[#6b7280] mt-1">
+                  Defina título, meta de palavras e período para começar o acompanhamento.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#e5e7eb] p-4">
+                <p className="font-semibold">2. Inicie sua primeira sessão</p>
+                <p className="text-sm text-[#6b7280] mt-1">
+                  Use o Editor para escrever, salvar progresso e exportar o texto.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#e5e7eb] p-4">
+                <p className="font-semibold">3. Acompanhe evolução no dashboard</p>
+                <p className="text-sm text-[#6b7280] mt-1">
+                  Veja meta mensal, consistência e progresso por projeto em tempo real.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="button"
+                onClick={() => dismissOnboarding(true)}
+              >
+                Pular por agora
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setOnboardingOpen(false);
+                  openNewProjectModal();
+                }}
+              >
+                Criar primeiro projeto
+              </button>
+            </div>
           </div>
         </div>
       )}
