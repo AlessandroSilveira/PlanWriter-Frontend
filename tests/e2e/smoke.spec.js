@@ -207,6 +207,26 @@ async function installApiMocks(page, state) {
   });
 }
 
+async function dismissGuidedOnboardingIfVisible(page) {
+  const heading = page.getByRole("heading", { name: "Onboarding guiado" });
+  const visible = await heading
+    .isVisible({ timeout: 1200 })
+    .catch(() => false);
+
+  if (!visible) return;
+
+  const skip = page.getByRole("button", { name: /Pular por agora/i });
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click();
+    return;
+  }
+
+  const close = page.getByRole("button", { name: "Fechar onboarding" });
+  if (await close.isVisible().catch(() => false)) {
+    await close.click();
+  }
+}
+
 test("login flow persists across reload", async ({ page }) => {
   const state = createMockState();
   await installApiMocks(page, state);
@@ -219,10 +239,15 @@ test("login flow persists across reload", async ({ page }) => {
   await page.getByRole("button", { name: /^Entrar$/ }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText("Bem vindo de volta, Escritor.")).toBeVisible();
+  await dismissGuidedOnboardingIfVisible(page);
+  await expect(page.getByRole("button", { name: /Sair/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Novo projeto/i })).toBeVisible({
+    timeout: 15000,
+  });
 
   await page.reload();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await dismissGuidedOnboardingIfVisible(page);
   await expect(page.getByText("Seus projetos")).toBeVisible();
 });
 
@@ -232,7 +257,11 @@ test("dashboard can create a new project through the modal", async ({ page }) =>
   await seedAuthenticatedSession(page, state);
 
   await page.goto("/dashboard");
-  await expect(page.getByText("Bem vindo de volta, Escritor.")).toBeVisible();
+  await dismissGuidedOnboardingIfVisible(page);
+  await expect(page.getByRole("button", { name: /Sair/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Novo projeto/i })).toBeVisible({
+    timeout: 15000,
+  });
 
   await page.getByRole("button", { name: /Novo projeto/i }).click();
   await expect(page.getByRole("heading", { name: "Novo Projeto" })).toBeVisible();
