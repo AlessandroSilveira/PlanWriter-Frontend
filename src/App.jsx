@@ -1,6 +1,6 @@
 // src/App.jsx
 import { Suspense, lazy, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar.jsx";
 import LoginPopover from "./components/LoginPopover.jsx";
@@ -44,6 +44,19 @@ function RouteFallback() {
   );
 }
 
+function ResetPasswordRedirect() {
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const token = query.get("token");
+  const target = new URLSearchParams({ auth: "reset" });
+
+  if (token) {
+    target.set("token", token);
+  }
+
+  return <Navigate to={`/?${target.toString()}`} replace />;
+}
+
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -63,6 +76,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Navigate to="/?auth=register" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/?auth=forgot" replace />} />
+        <Route path="/reset-password" element={<ResetPasswordRedirect />} />
         <Route path="/resources" element={<Resources />} />
         <Route path="/u/:slug" element={<PublicProfile />} />
 
