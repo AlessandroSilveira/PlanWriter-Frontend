@@ -56,6 +56,11 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
     navigate("/register");
   };
 
+  const handleForgotRedirect = () => {
+    onClose?.();
+    navigate("/forgot-password");
+  };
+
   // --- posicionamento ---
   const rect = anchorEl?.getBoundingClientRect();
   const popoverWidth = 320;
@@ -109,6 +114,16 @@ export default function LoginPopover({ open, anchorEl, onClose }) {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </div>
+
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={handleForgotRedirect}
+              className="text-sm text-indigo-600 hover:underline"
+            >
+              Esqueci minha senha
+            </button>
           </div>
 
           <div className="flex gap-2 mt-2">

@@ -67,6 +67,9 @@ export default function Login() {
 
         <div className="hr-soft mt-4"></div>
         <p className="subhead" style={{ marginTop: 12 }}>
+          <Link to="/forgot-password">Esqueci minha senha</Link>
+        </p>
+        <p className="subhead" style={{ marginTop: 8 }}>
           Não tem conta? <Link to="/register">Criar conta</Link>
         </p>
       </div>
