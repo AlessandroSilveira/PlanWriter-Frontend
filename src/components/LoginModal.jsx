@@ -202,6 +202,32 @@ export default function LoginModal({
         typeof response?.message === "string" && response.message.trim()
           ? response.message.trim()
           : "Se o email informado existir, as instruções de recuperação foram enviadas.";
+      const responseResetToken =
+        typeof response?.resetToken === "string" && response.resetToken.trim()
+          ? response.resetToken.trim()
+          : null;
+      const responseExpiresAt =
+        typeof response?.expiresAtUtc === "string" && response.expiresAtUtc.trim()
+          ? response.expiresAtUtc.trim()
+          : null;
+
+      if (responseResetToken) {
+        setResetToken(responseResetToken);
+        setMode("reset");
+        setFeedback({
+          open: true,
+          type: "success",
+          title: "Token gerado",
+          message: responseExpiresAt
+            ? `Token carregado automaticamente. Validade até ${new Date(responseExpiresAt).toLocaleString("pt-BR")}.`
+            : "Token carregado automaticamente. Defina sua nova senha para concluir.",
+          primaryLabel: "Continuar",
+          onPrimary: () => {
+            closeFeedback();
+          },
+        });
+        return;
+      }
 
       setFeedback({
         open: true,
