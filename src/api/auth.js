@@ -50,6 +50,21 @@ export async function logoutAllSessions() {
   );
 }
 
+export async function forgotPassword({ email }) {
+  const { data } = await api.post("/auth/forgot-password", {
+    Email: email,
+  });
+  return data;
+}
+
+export async function resetPassword({ token, newPassword }) {
+  const { data } = await api.post("/auth/reset-password", {
+    Token: token,
+    NewPassword: newPassword,
+  });
+  return data;
+}
+
 export function logout() {
   return logoutSession();
 }

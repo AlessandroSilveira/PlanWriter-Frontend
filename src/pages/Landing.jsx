@@ -9,17 +9,22 @@ export default function Landing() {
   const navigate = useNavigate();
 
   const authIntent = searchParams.get("auth");
+  const resetTokenFromQuery = searchParams.get("token") || "";
   const sessionReason = searchParams.get("session");
   const [showSessionExpiredNotice, setShowSessionExpiredNotice] = useState(false);
-  const modalInitialMode = useMemo(
-    () => (authIntent === "register" ? "register" : "login"),
-    [authIntent]
-  );
+  const modalInitialMode = useMemo(() => {
+    if (authIntent === "register") return "register";
+    if (authIntent === "forgot") return "forgot";
+    if (authIntent === "reset") return "reset";
+    return "login";
+  }, [authIntent]);
 
   useEffect(() => {
     if (
       authIntent === "register" ||
       authIntent === "login" ||
+      authIntent === "forgot" ||
+      authIntent === "reset" ||
       sessionReason === "expired"
     ) {
       setOpen(true);
@@ -38,7 +43,7 @@ export default function Landing() {
     setShowSessionExpiredNotice(false);
     clearAuthNotice();
 
-    if (authIntent || sessionReason) {
+    if (authIntent || sessionReason || resetTokenFromQuery) {
       navigate("/", { replace: true });
     }
   };
@@ -112,6 +117,7 @@ export default function Landing() {
         open={open}
         onClose={handleCloseModal}
         initialMode={modalInitialMode}
+        initialResetToken={resetTokenFromQuery}
         showSessionExpiredNotice={showSessionExpiredNotice}
       />
     </>

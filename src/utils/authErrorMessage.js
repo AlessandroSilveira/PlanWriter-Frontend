@@ -97,3 +97,44 @@ export function getRegisterFriendlyMessage(error, fallbackMessage) {
 
   return fallback;
 }
+
+export function getRecoveryFriendlyMessage(error, fallbackMessage) {
+  const fallback = fallbackMessage || "Não foi possível concluir a recuperação de senha.";
+  const status = error?.response?.status;
+
+  if (status === 400) {
+    const validationMessages = extractValidationMessages(error);
+    if (validationMessages.length > 0) {
+      return validationMessages[0];
+    }
+
+    const rawBadRequest = error?.response?.data;
+    if (typeof rawBadRequest === "string" && rawBadRequest.trim()) {
+      return rawBadRequest.trim();
+    }
+  }
+
+  if (status === 429) {
+    return "Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.";
+  }
+
+  if (typeof status === "number" && status >= 500) {
+    return "Estamos com instabilidade no servidor. Tente novamente em instantes.";
+  }
+
+  const apiMessage = error?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+
+  const rawMessage = error?.message;
+  if (typeof rawMessage === "string" && /^Request failed with status code \d+$/i.test(rawMessage)) {
+    return fallback;
+  }
+
+  if (typeof rawMessage === "string" && rawMessage.trim()) {
+    return rawMessage.trim();
+  }
+
+  return fallback;
+}

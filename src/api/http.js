@@ -237,7 +237,9 @@ function isPublicAuthRequest(url) {
   return (
     normalized.includes("/auth/login") ||
     normalized.includes("/auth/register") ||
-    normalized.includes("/auth/refresh")
+    normalized.includes("/auth/refresh") ||
+    normalized.includes("/auth/forgot-password") ||
+    normalized.includes("/auth/reset-password")
   );
 }
 
