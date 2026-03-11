@@ -206,26 +206,9 @@ export default function LoginModal({
         typeof response?.resetToken === "string" && response.resetToken.trim()
           ? response.resetToken.trim()
           : null;
-      const responseExpiresAt =
-        typeof response?.expiresAtUtc === "string" && response.expiresAtUtc.trim()
-          ? response.expiresAtUtc.trim()
-          : null;
-
       if (responseResetToken) {
         setResetToken(responseResetToken);
         setMode("reset");
-        setFeedback({
-          open: true,
-          type: "success",
-          title: "Token gerado",
-          message: responseExpiresAt
-            ? `Token carregado automaticamente. Validade até ${new Date(responseExpiresAt).toLocaleString("pt-BR")}.`
-            : "Token carregado automaticamente. Defina sua nova senha para concluir.",
-          primaryLabel: "Continuar",
-          onPrimary: () => {
-            closeFeedback();
-          },
-        });
         return;
       }
 
@@ -522,20 +505,24 @@ export default function LoginModal({
         {mode === "reset" && (
           <form onSubmit={submitResetPassword} className="space-y-3">
             <p className="text-sm text-slate-600">
-              Informe o token recebido e escolha sua nova senha.
+              {resetToken.trim()
+                ? "Escolha sua nova senha para concluir a recuperação."
+                : "Informe o token recebido e escolha sua nova senha."}
             </p>
 
-            <div>
-              <label className="label">Token de recuperação</label>
-              <input
-                className="input w-full"
-                type="text"
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
-                required
-                autoFocus={!initialResetToken}
-              />
-            </div>
+            {!resetToken.trim() && (
+              <div>
+                <label className="label">Token de recuperação</label>
+                <input
+                  className="input w-full"
+                  type="text"
+                  value={resetToken}
+                  onChange={(e) => setResetToken(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+            )}
 
             <div>
               <label className="label">Nova senha</label>
@@ -545,6 +532,7 @@ export default function LoginModal({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
+                autoFocus={Boolean(resetToken.trim())}
               />
             </div>
 
