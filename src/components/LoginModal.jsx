@@ -116,6 +116,7 @@ export default function LoginModal({
     setPassword("");
     setNewPassword("");
     setConfirmNewPassword("");
+    setResetToken("");
   };
 
   const goToRegister = () => {
@@ -125,6 +126,8 @@ export default function LoginModal({
   const goToForgot = () => {
     setMode("forgot");
     setPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
   };
 
   const submitLogin = async (e) => {
@@ -198,16 +201,15 @@ export default function LoginModal({
 
     try {
       const response = await forgotPassword({ email });
-      const responseMessage =
-        typeof response?.message === "string" && response.message.trim()
-          ? response.message.trim()
-          : "Se o email informado existir, as instruções de recuperação foram enviadas.";
       const responseResetToken =
         typeof response?.resetToken === "string" && response.resetToken.trim()
           ? response.resetToken.trim()
           : null;
+
       if (responseResetToken) {
         setResetToken(responseResetToken);
+        setNewPassword("");
+        setConfirmNewPassword("");
         setMode("reset");
         return;
       }
@@ -505,24 +507,8 @@ export default function LoginModal({
         {mode === "reset" && (
           <form onSubmit={submitResetPassword} className="space-y-3">
             <p className="text-sm text-slate-600">
-              {resetToken.trim()
-                ? "Escolha sua nova senha para concluir a recuperação."
-                : "Informe o token recebido e escolha sua nova senha."}
+              Escolha sua nova senha para concluir a recuperação.
             </p>
-
-            {!resetToken.trim() && (
-              <div>
-                <label className="label">Token de recuperação</label>
-                <input
-                  className="input w-full"
-                  type="text"
-                  value={resetToken}
-                  onChange={(e) => setResetToken(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-            )}
 
             <div>
               <label className="label">Nova senha</label>
@@ -532,7 +518,7 @@ export default function LoginModal({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
-                autoFocus={Boolean(resetToken.trim())}
+                autoFocus
               />
             </div>
 
