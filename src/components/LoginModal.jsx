@@ -201,6 +201,10 @@ export default function LoginModal({
 
     try {
       const response = await forgotPassword({ email });
+      const responseMessage =
+        typeof response?.message === "string" && response.message.trim()
+          ? response.message.trim()
+          : "Se o email informado existir, as instruções de recuperação foram geradas.";
       const responseResetToken =
         typeof response?.resetToken === "string" && response.resetToken.trim()
           ? response.resetToken.trim()
@@ -250,10 +254,13 @@ export default function LoginModal({
       setFeedback({
         open: true,
         type: "warning",
-        title: "Token obrigatório",
-        message: "Informe o token de recuperação recebido para continuar.",
-        primaryLabel: "OK",
-        onPrimary: null,
+        title: "Recuperação expirada",
+        message: "Solicite uma nova redefinição de senha para continuar.",
+        primaryLabel: "Gerar novo acesso",
+        onPrimary: () => {
+          closeFeedback();
+          goToForgot();
+        },
       });
       return;
     }
